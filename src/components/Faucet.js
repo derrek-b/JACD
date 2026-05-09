@@ -47,22 +47,15 @@ const Faucet = () => {
     setIsClaiming(false)
   }
 
-  const checkForAssets = () => {
-    if(balances[1] >= 100 && nftBalances[1] > 0) {
-      setCanClaim(false)
-    } else {
-      setCanClaim(true)
-    }
-  }
   /* #endregion */
 
   /* #region Hooks */
 
   useEffect(() => {
-    if(account) {
-      checkForAssets()
-    }
-  }, [account, balances])
+    if (!account) return
+    const hasEnough = balances[1] >= 100 && nftBalances[1] > 0
+    setCanClaim(!hasEnough)
+  }, [account, balances, nftBalances])
   /* #endregion */
 
   return(

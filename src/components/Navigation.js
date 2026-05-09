@@ -28,21 +28,21 @@ const Navigation = () => {
   const holderProposals = useSelector((state) => state.dao.holderProposals)
   const openProposals = useSelector((state) => state.dao.openProposals)
 
-  const connectHandler = async () => {
-    let account = await loadAccount(dispatch)
-    await loadUserBalances(tokens, account, dispatch)
-    await loadNFTBalances(nfts, account, dispatch)
-    await loadHolderVoteStatus(dao, holderProposals, account, dispatch)
-    await loadHolderOpenVoteStatus(dao, openProposals, account, dispatch)
-  }
+  const connect = () => loadAccount(dispatch)
   /* #endregion */
 
   /* #region Hooks */
 
   useEffect(() => {
-    if(account) {
-      connectHandler()
-    }
+    if (!account) return
+    loadUserBalances(tokens, account, dispatch)
+    loadNFTBalances(nfts, account, dispatch)
+    loadHolderVoteStatus(dao, holderProposals, account, dispatch)
+    loadHolderOpenVoteStatus(dao, openProposals, account, dispatch)
+    // Deliberately depend only on `account`. The other reads (tokens, nfts,
+    // dao, proposals) are ambient state already loaded by App.js; re-firing
+    // this whole reload chain whenever a proposal mutates would be wasteful.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account])
 /* #endregion */
 
@@ -54,7 +54,7 @@ const Navigation = () => {
           {account ? (
             <Navbar.Text>{account.slice(0, 5)}...{account.slice(-4)}</Navbar.Text>
           ) : (
-            <Button onClick={connectHandler}>Connect Wallet</Button>
+            <Button onClick={connect}>Connect Wallet</Button>
           )}
         </div>
       </Navbar.Collapse>

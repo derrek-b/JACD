@@ -55,18 +55,6 @@ const HolderVote = () => {
     return n / 10**6
   }
 
-  const getVotes = async () => {
-    let votes = 0
-
-    for(let i = 0; i < nftBalances.length; i++) {
-      if(+nftBalances[i] > 0) {
-        votes += +nftBalances[i]
-      }
-    }
-
-    setUserHolderVotes(votes)
-  }
-
   const buildVotingClosed = () => {
     const votingClosed = []
 
@@ -138,9 +126,8 @@ const HolderVote = () => {
   /* #region Hooks */
 
   useEffect(() => {
-    if(account) {
-      getVotes()
-    }
+    if (!account) return
+    setUserHolderVotes(nftBalances.reduce((sum, b) => sum + +b, 0))
   }, [account, nftBalances])
   /* #endregion */
 

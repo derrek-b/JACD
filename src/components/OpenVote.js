@@ -65,30 +65,6 @@ const OpenVote = () => {
     return n / 10**6
   }
 
-  const isMember = () => {
-    setIsDAOMember(false)
-    setIsHolder(false)
-    setUserHolderVotes(0)
-    setIsContributor(false)
-
-    let votes = 0
-
-    if(balances[0] > 0) {
-      setIsDAOMember(true)
-      setIsContributor(true)
-    }
-
-    for(let i = 0; i < nftBalances.length; i++) {
-      if(nftBalances[i] > 0) {
-        setIsDAOMember(true)
-        setIsHolder(true)
-        votes += (nftBalances[i] * +holdersWeight)
-      }
-    }
-
-    setUserHolderVotes(votes)
-  }
-
   const buildVotingClosed = () => {
     const votingClosed = []
 
@@ -170,13 +146,20 @@ const OpenVote = () => {
 
 /* #region Hooks */
   useEffect(() => {
-    if(account) {
-      isMember()
-    }
-  }, [account, balances, nftBalances])
+    if (!account) return
+
+    const hasTokens = balances[0] > 0
+    const totalNFTs = nftBalances.reduce((sum, b) => sum + +b, 0)
+
+    setIsContributor(hasTokens)
+    setIsHolder(totalNFTs > 0)
+    setIsDAOMember(hasTokens || totalNFTs > 0)
+    setUserHolderVotes(totalNFTs * +holdersWeight)
+  }, [account, balances, nftBalances, holdersWeight])
 
   useEffect(() => {
     buildVotingClosed()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openProposals])
 /* #endregion */
 

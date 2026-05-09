@@ -44,22 +44,6 @@ const Info = () => {
 
   /* #region Component Functions */
 
-  const isMember = () => {
-    setIsDAOMember(false)
-
-    if(balances[0] > 0) {
-      setIsDAOMember(true)
-      return
-    }
-
-    for(let i = 0; i < nftBalances.length; i++) {
-      if(nftBalances[i] > 0) {
-        setIsDAOMember(true)
-        return
-      }
-    }
-  }
-
   const submitHandler = async (e) => {
     e.preventDefault()
     setIsWaiting(true)
@@ -84,9 +68,11 @@ const Info = () => {
   /* #region Hooks */
 
   useEffect(() => {
-    if(account) {
-      isMember()
-    }
+    if (!account) return
+
+    const hasTokens = balances[0] > 0
+    const hasNFT = nftBalances.some(b => b > 0)
+    setIsDAOMember(hasTokens || hasNFT)
   }, [account, balances, nftBalances])
   /* #endregion */
 

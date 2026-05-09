@@ -73,20 +73,26 @@ function App() {
 
   useEffect(() => {
     loadBlockchainData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  /* #endregion */
 
-  /* #region Event Listeners */
+  useEffect(() => {
+    const onAccountsChanged = () => loadAccount(dispatch)
+    const onNetworkChanged = () => {
+      setShowAlert(false)
+      setOnChain(false)
+      loadBlockchainData()
+    }
 
-  window.ethereum.on('accountsChanged', async () => {
-    await loadAccount(dispatch)
-  })
+    window.ethereum.on('accountsChanged', onAccountsChanged)
+    window.ethereum.on('networkChanged', onNetworkChanged)
 
-  window.ethereum.on('networkChanged', async () => {
-    setShowAlert(false)
-    setOnChain(false)
-    await loadBlockchainData()
-  })
+    return () => {
+      window.ethereum.removeListener('accountsChanged', onAccountsChanged)
+      window.ethereum.removeListener('networkChanged', onNetworkChanged)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   /* #endregion */
 
   return (
