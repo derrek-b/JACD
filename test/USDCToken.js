@@ -199,12 +199,11 @@ describe('Token', () => {
 
       describe('Minting Failures', () => {
         it('rejects unauthorized minter addresses', async () => {
-          await expect(token.connect(recipient).mint(recipient, amount)).to.be.rejected
+          await expect(token.connect(delegate).mint(recipient, amount)).to.be.reverted
         })
 
         it('rejects invalid recipient addresses', async () => {
-          await expect(token.connect(owner).mint('0x0', amount)).to.be.rejected
-          await expect(token.connect(owner).mint('0x0000000000000000000000000000000000000000', amount)).to.be.rejected
+          await expect(token.connect(deployer).mint('0x0000000000000000000000000000000000000000', amount)).to.be.reverted
         })
       })
     })

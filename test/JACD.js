@@ -48,10 +48,10 @@ describe('JACD', () => {
       'Jetpacks',
       'JP',
       ether(.01),
-      1,
+      10,
       Date.now().toString().slice(0, 10),
       'x',
-      1
+      10
     )
 
     const Hoverboards = await ethers.getContractFactory('NFT')
@@ -59,10 +59,10 @@ describe('JACD', () => {
       'Hoverboards',
       'HB',
       ether(.01),
-      2,
+      10,
       Date.now().toString().slice(0, 10),
       'y',
-      2
+      10
     )
 
     const AVAs = await ethers.getContractFactory('NFT')
@@ -70,16 +70,16 @@ describe('JACD', () => {
       'AVAs',
       'AVA',
       ether(.01),
-      3,
+      10,
       Date.now().toString().slice(0, 10),
       'z',
-      3
+      10
     )
 
     const collections = [jetpacks.address, hoverboards.address, avas.address]
 
     const JACDDAO = await ethers.getContractFactory('JACD')
-    jacdDAO = await JACDDAO.deploy(jacdToken.address, usdcToken.address, collections, 10, 100, 6, 3, tokens(600), 604800, 1209600)
+    jacdDAO = await JACDDAO.deploy(jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 6, 3, tokens(12), 604800, 1209600)
 
     transaction = await jacdToken.connect(deployer).transferOwnership(jacdDAO.address)
     await transaction.wait()
@@ -104,6 +104,32 @@ describe('JACD', () => {
       expect(collections[0]).to.equal(jetpacks.address)
       expect(collections[1]).to.equal(hoverboards.address)
       expect(collections[2]).to.equal(avas.address)
+    })
+
+    it('exposes holders weights via getter', async () => {
+      const weights = await jacdDAO.getHoldersWeights()
+
+      expect(weights.length).to.equal(3)
+      expect(weights[0]).to.equal(5)
+      expect(weights[1]).to.equal(3)
+      expect(weights[2]).to.equal(1)
+    })
+
+    it('rejects deployment when weights and collections lengths mismatch', async () => {
+      const JACDDAO = await ethers.getContractFactory('JACD')
+
+      await expect(JACDDAO.deploy(
+        jacdToken.address,
+        usdcToken.address,
+        [jetpacks.address, hoverboards.address, avas.address],
+        10,
+        [5, 3],
+        6,
+        3,
+        tokens(12),
+        604800,
+        1209600
+      )).to.be.revertedWith('JACD: weights/collections length mismatch')
     })
   })
 
@@ -478,6 +504,11 @@ describe('JACD', () => {
           .to.be.revertedWith('JACD: vote has not ended')
       })
 
+      it('rejects finalization from non-holders', async () => {
+        await expect(jacdDAO.connect(rando).finalizeHoldersVote(1))
+          .to.be.revertedWith('JACD: not a holder')
+      })
+
       it('rejects finalization of proposals not in holders stage', async () => {
         transaction = await jacdDAO.connect(deployer).createProposal(rando.address, usdc(.1), 'Prop 1', 'Description of Prop 1')
         await transaction.wait()
@@ -560,8 +591,8 @@ describe('JACD', () => {
       it('records the votes', async () => {
         let proposal = await jacdDAO.proposals(1)
 
-        expect(proposal.votesFor).to.equal(votes(401))
-        expect(proposal.votesAgainst).to.equal(votes(200))
+        expect(proposal.votesFor).to.equal(votes(9))
+        expect(proposal.votesAgainst).to.equal(votes(6))
       })
 
       it('updates a holders voting status', async () => {
@@ -588,7 +619,7 @@ describe('JACD', () => {
 
         let proposal = await jacdDAO.proposals(1)
 
-        expect(proposal.votesFor).to.equal(votes(402))
+        expect(proposal.votesFor).to.equal(votes(10))
       })
 
       it('burns JACD tokens for votes', async () => {
@@ -612,6 +643,14 @@ describe('JACD', () => {
       it('rejects votes from non-holders/non-contributors', async () => {
         await expect(jacdDAO.connect(rando).openVote(1, true, 0))
           .to.be.rejectedWith('JACD: not a holder or an contributor')
+      })
+
+      it('rejects votes on proposals not in open stage', async () => {
+        transaction = await jacdDAO.connect(deployer).createProposal(rando.address, usdc(1), 'Prop 2', 'Description of Prop 2')
+        await transaction.wait()
+
+        await expect(jacdDAO.connect(holder).openVote(2, true, 0))
+          .to.be.revertedWith('JACD: not in "open" voting stage ')
       })
 
       it('prevents holders voting twice/votes with 0 JACD tokens', async () => {
@@ -783,6 +822,11 @@ describe('JACD', () => {
           .to.be.revertedWith('JACD: vote has not ended')
       })
 
+      it('rejects finalization from non-holders', async () => {
+        await expect(jacdDAO.connect(rando).finalizeProposal(1))
+          .to.be.revertedWith('JACD: not a holder')
+      })
+
       it('prevents finalization for insufficient USDC balance', async () => {
         for(i = 2; i < 12; i++) {
           transaction = await jacdDAO.connect(deployer).createProposal(rando.address, usdc(10), 'Prop 1', 'Description of Prop 1')
@@ -818,41 +862,40 @@ describe('JACD', () => {
   })
 
   describe('Faucet Request', () => {
+    const totalNftBalance = async (addr) =>
+      (await jetpacks.balanceOf(addr)).toNumber() +
+      (await hoverboards.balanceOf(addr)).toNumber() +
+      (await avas.balanceOf(addr)).toNumber()
+
     describe('Success', () => {
-      let balanceBefore
-
       beforeEach(async () => {
-        balanceBefore = await rando.getBalance()
-
         transaction = await usdcToken.connect(deployer).mint(deployer.address, usdc(1000))
         await transaction.wait()
 
         transaction = await usdcToken.connect(deployer).approve(jacdDAO.address, usdc(1000))
         await transaction.wait()
 
-        transaction = await hoverboards.connect(deployer).addToWhitelist(deployer.address)
-        await transaction.wait()
+        for (const nft of [jetpacks, hoverboards, avas]) {
+          transaction = await nft.connect(deployer).addToWhitelist(deployer.address)
+          await transaction.wait()
 
-        transaction = await hoverboards.connect(deployer).mint(2, { value: ether(.02) })
-        await transaction.wait()
+          transaction = await nft.connect(deployer).mint(1, { value: ether(.01) })
+          await transaction.wait()
 
-        transaction = await hoverboards.connect(deployer).setApprovalForAll(jacdDAO.address, true)
-        await transaction.wait()
+          transaction = await nft.connect(deployer).setApprovalForAll(jacdDAO.address, true)
+          await transaction.wait()
+        }
 
         transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
         await transaction.wait()
       })
 
-      it('transfers assets to requester', async () => {
+      it('tops up requester USDC to 100 and gives one NFT', async () => {
         expect(await usdcToken.balanceOf(rando.address)).to.equal(usdc(100))
-        expect(await hoverboards.balanceOf(rando.address)).to.equal(1)
+        expect(await totalNftBalance(rando.address)).to.equal(1)
       })
 
-      //update
-      it('transfers just enough tokens so requestor has 100', async () => {
-        transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
-        await transaction.wait()
-
+      it('transfers just enough USDC so requestor has 100', async () => {
         transaction = await usdcToken.connect(rando).approve(jacdDAO.address, usdc(50))
         await transaction.wait()
 
@@ -865,11 +908,23 @@ describe('JACD', () => {
         expect(await usdcToken.balanceOf(rando.address)).to.equal(usdc(100))
       })
 
-      it('does not transfer nft if requestor already holds one', async () => {
+      it('does not transfer an nft if requester already holds one of every collection', async () => {
+        for (const nft of [jetpacks, hoverboards, avas]) {
+          if ((await nft.balanceOf(rando.address)).toNumber() > 0) continue
+
+          transaction = await nft.connect(deployer).addToWhitelist(rando.address)
+          await transaction.wait()
+
+          transaction = await nft.connect(rando).mint(1, { value: ether(.01) })
+          await transaction.wait()
+        }
+
+        expect(await totalNftBalance(rando.address)).to.equal(3)
+
         transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
         await transaction.wait()
 
-        expect(await hoverboards.balanceOf(rando.address)).to.equal(1)
+        expect(await totalNftBalance(rando.address)).to.equal(3)
       })
     })
 
@@ -888,18 +943,135 @@ describe('JACD', () => {
           .to.be.revertedWith('JACD: not enough remaining USDC for faucet')
       })
 
-      it('rejects requests for insufficient NFT balance', async () => {
+      it('still tops up USDC even when source has no NFTs to give', async () => {
         transaction = await usdcToken.connect(deployer).mint(deployer.address, usdc(100))
         await transaction.wait()
 
         transaction = await usdcToken.connect(deployer).approve(jacdDAO.address, usdc(100))
         await transaction.wait()
 
-        await expect(jacdDAO.connect(rando).faucetRequest(
-          deployer.address
-        ))
-          .to.be.revertedWith('JACD: no hoverboards left for faucet')
+        const nftsBefore = await totalNftBalance(rando.address)
+
+        transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
+        await transaction.wait()
+
+        expect(await usdcToken.balanceOf(rando.address)).to.equal(usdc(100))
+        expect(await totalNftBalance(rando.address)).to.equal(nftsBefore)
       })
+    })
+  })
+
+  describe('Token Failure Paths', () => {
+    it('reverts receiveDeposit when USDC transferFrom returns false', async () => {
+      const MockBadERC20 = await ethers.getContractFactory('MockBadERC20')
+      const badUsdc = await MockBadERC20.deploy()
+
+      transaction = await badUsdc.setFailTransferFrom(true)
+      await transaction.wait()
+
+      const collections = [jetpacks.address, hoverboards.address, avas.address]
+      const JACDDAO = await ethers.getContractFactory('JACD')
+      const badDAO = await JACDDAO.deploy(
+        jacdToken.address, badUsdc.address, collections,
+        10, [5, 3, 1], 6, 3, tokens(12), 604800, 1209600
+      )
+
+      await expect(badDAO.connect(contributor).receiveDeposit(usdc(100)))
+        .to.be.revertedWith('JACD: USDC transfer failed')
+    })
+
+    it('reverts receiveDeposit when JACD mint returns false', async () => {
+      const MockBadJACDToken = await ethers.getContractFactory('MockBadJACDToken')
+      const badJacd = await MockBadJACDToken.deploy('Bad JACD', 'BJACD')
+
+      const collections = [jetpacks.address, hoverboards.address, avas.address]
+      const JACDDAO = await ethers.getContractFactory('JACD')
+      const badDAO = await JACDDAO.deploy(
+        badJacd.address, usdcToken.address, collections,
+        10, [5, 3, 1], 6, 3, tokens(12), 604800, 1209600
+      )
+
+      transaction = await badJacd.connect(deployer).transferOwnership(badDAO.address)
+      await transaction.wait()
+
+      transaction = await usdcToken.connect(deployer).mint(contributor.address, AMOUNTINUSDC)
+      await transaction.wait()
+
+      transaction = await usdcToken.connect(contributor).approve(badDAO.address, AMOUNTINUSDC)
+      await transaction.wait()
+
+      await expect(badDAO.connect(contributor).receiveDeposit(AMOUNTINUSDC))
+        .to.be.revertedWith('JACD: distribution of JACD tokens failed')
+    })
+
+    it('reverts finalizeProposal when USDC transfer returns false', async () => {
+      const MockBadERC20 = await ethers.getContractFactory('MockBadERC20')
+      const badUsdc = await MockBadERC20.deploy()
+
+      const FreshJACDToken = await ethers.getContractFactory('JACDToken')
+      const freshJacd = await FreshJACDToken.deploy('JACD Coin', 'JACD')
+
+      const collections = [jetpacks.address, hoverboards.address, avas.address]
+      const JACDDAO = await ethers.getContractFactory('JACD')
+      const badDAO = await JACDDAO.deploy(
+        freshJacd.address, badUsdc.address, collections,
+        10, [5, 3, 1], 6, 3, tokens(12), 604800, 1209600
+      )
+
+      transaction = await freshJacd.connect(deployer).transferOwnership(badDAO.address)
+      await transaction.wait()
+
+      transaction = await badUsdc.mint(contributor.address, usdc(100))
+      await transaction.wait()
+
+      transaction = await badUsdc.connect(contributor).approve(badDAO.address, usdc(100))
+      await transaction.wait()
+
+      transaction = await badDAO.connect(contributor).receiveDeposit(usdc(100))
+      await transaction.wait()
+
+      transaction = await jetpacks.connect(deployer).addToWhitelist(holder.address)
+      await transaction.wait()
+
+      transaction = await hoverboards.connect(deployer).addToWhitelist(holder.address)
+      await transaction.wait()
+
+      transaction = await avas.connect(deployer).addToWhitelist(deployer.address)
+      await transaction.wait()
+
+      transaction = await jetpacks.connect(holder).mint(1, { value: ether(.01) })
+      await transaction.wait()
+
+      transaction = await hoverboards.connect(holder).mint(2, { value: ether(.02) })
+      await transaction.wait()
+
+      transaction = await avas.connect(deployer).mint(3, { value: ether(.03) })
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).createProposal(rando.address, usdc(10), 'Prop 1', 'Description of Prop 1')
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).holdersVote(1, true)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).holdersVote(1, true)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).finalizeHoldersVote(1)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).openVote(1, true, 0)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).openVote(1, true, 0)
+      await transaction.wait()
+
+      await time.increase(1209601)
+
+      transaction = await badUsdc.setFailTransfer(true)
+      await transaction.wait()
+
+      await expect(badDAO.connect(holder).finalizeProposal(1)).to.be.reverted
     })
   })
 })

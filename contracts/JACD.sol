@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import 'hardhat/console.sol';
 import './JACDToken.sol';
 import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import './NFT.sol';
@@ -11,7 +10,7 @@ contract JACD {
     IERC20 public usdcToken;
 
     uint8 public maxProposalAmountPercent;
-    uint256 public holdersWeight;
+    uint256[] public holdersWeights;
     uint256 public holderVotes;
     uint256 public minHolderVotesToPass;
     uint256 public minVotesToFinalize;
@@ -83,8 +82,6 @@ contract JACD {
                 isHolderOrContributor = true;
                 break;
             }
-
-            if (isHolderOrContributor) {break;}
         }
 
         if((!isHolderOrContributor) && jacdToken.balanceOf(msg.sender) > 0) {
@@ -104,16 +101,9 @@ contract JACD {
                 isHolder = true;
                 break;
             }
-
-            if (isHolder) {break;}
         }
 
         require(isHolder, 'JACD: not a holder');
-        _;
-    }
-
-    modifier onlyContributors {
-        require(jacdToken.balanceOf(msg.sender) > 0, 'JACD: not an contributor');
         _;
     }
 
@@ -122,7 +112,7 @@ contract JACD {
         IERC20 _usdcToken,
         NFT[] memory _collections,
         uint8 _maxProposalAmountPercent,
-        uint256 _holdersWeight,
+        uint256[] memory _holdersWeights,
         uint256 _holderVotes,
         uint256 _minHolderVotesToPass,
         uint256 _minVotesToFinalize,
@@ -130,11 +120,13 @@ contract JACD {
         uint256 _openVoteTime
     )
     {
+        require(_holdersWeights.length == _collections.length, 'JACD: weights/collections length mismatch');
+
         jacdToken = _jacdToken;
         usdcToken = _usdcToken;
         collections = _collections;
         maxProposalAmountPercent = _maxProposalAmountPercent;
-        holdersWeight = _holdersWeight;
+        holdersWeights = _holdersWeights;
         holderVotes = _holderVotes;
         minHolderVotesToPass = _minHolderVotesToPass;
         minVotesToFinalize = _minVotesToFinalize;
@@ -144,6 +136,10 @@ contract JACD {
 
     function getCollections() public view returns (NFT[] memory) {
         return collections;
+    }
+
+    function getHoldersWeights() public view returns (uint256[] memory) {
+        return holdersWeights;
     }
 
     function collectionsLength() public view returns (uint256) {
@@ -292,7 +288,7 @@ contract JACD {
 
         if(!holderOpenVoted[_index][msg.sender]) {
             for(uint256 i; i < collections.length; i++) {
-                allVotes += collections[i].balanceOf(msg.sender) * (holdersWeight * 1e18);
+                allVotes += collections[i].balanceOf(msg.sender) * (holdersWeights[i] * 1e18);
             }
         }
 
@@ -342,66 +338,62 @@ contract JACD {
         }
     }
 
-    function setMaxProposalAmountPercent(uint8 _percent) private {
-        require(_percent > 0, 'JACD: new max prop amt percent 0');
-        require(_percent <= 100, 'JACD: new max prop amt percent > 100');
+    // Setter functions are for a future governance upgrade
+    // function setMaxProposalAmountPercent(uint8 _percent) private {
+    //     require(_percent > 0, 'JACD: new max prop amt percent 0');
+    //     require(_percent <= 100, 'JACD: new max prop amt percent > 100');
 
-        maxProposalAmountPercent = _percent;
-    }
+    //     maxProposalAmountPercent = _percent;
+    // }
 
-    function setHoldersWeight(uint256 _weight) private {
-        require(_weight > 0, 'JACD: new vote weight 0');
+    // function setHoldersWeights(uint256[] memory _weights) private {
+    //     require(_weights.length == collections.length, 'JACD: weights/collections length mismatch');
 
-        holdersWeight = _weight;
-    }
+    //     holdersWeights = _weights;
+    // }
 
-    function setMinHolderVotesToPass(uint256 _minHolderVotes) private {
-        require(_minHolderVotes > 0, 'JACD: new minimum holder votes 0');
+    // function setMinHolderVotesToPass(uint256 _minHolderVotes) private {
+    //     require(_minHolderVotes > 0, 'JACD: new minimum holder votes 0');
 
-        minHolderVotesToPass = _minHolderVotes;
-    }
+    //     minHolderVotesToPass = _minHolderVotes;
+    // }
 
-    function setMinVotesToFinalize(uint256 _minVotes) private {
-        require(_minVotes > 0, 'JACD: new minimum votes 0');
+    // function setMinVotesToFinalize(uint256 _minVotes) private {
+    //     require(_minVotes > 0, 'JACD: new minimum votes 0');
 
-        minHolderVotesToPass = _minVotes;
-    }
+    //     minHolderVotesToPass = _minVotes;
+    // }
 
-    function setHolderVoteTime(uint256 _time) private {
-        require(_time > 0, 'JACD: new holder vote time 0');
+    // function setHolderVoteTime(uint256 _time) private {
+    //     require(_time > 0, 'JACD: new holder vote time 0');
 
-        holderVoteTime = _time;
-    }
+    //     holderVoteTime = _time;
+    // }
 
-    function setOpenVoteTime(uint256 _time) private {
-        require(_time > 0, 'JACD: new open vote time 0');
+    // function setOpenVoteTime(uint256 _time) private {
+    //     require(_time > 0, 'JACD: new open vote time 0');
 
-        openVoteTime = _time;
-    }
+    //     openVoteTime = _time;
+    // }
 
     function faucetRequest(address _from) external {
         require(_from != address(0), 'JACD: invalid faucet sender address');
-        console.log('fR', 1);
 
         int256 requestAmount = (100 * 10**6) - int256(usdcToken.balanceOf(msg.sender));
-        console.log('fR', 2);
         require(requestAmount <= int256(usdcToken.balanceOf(_from)), 'JACD: not enough remaining USDC for faucet');
-        console.log('fR', 3);
 
         if(requestAmount > 0) {
             usdcToken.transferFrom(_from, msg.sender, uint256(requestAmount));
-        console.log('fR', 4);
         }
 
-        NFT hoverboards = collections[1];
-        console.log('fR', 5);
-        uint256[] memory tokenIds = hoverboards.walletOfOwner(_from);
-        console.log('fR', 6);
-        require(tokenIds.length > 0, 'JACD: no hoverboards left for faucet');
-        console.log('fR', 7);
+        uint256 idx = uint256(keccak256(abi.encodePacked(block.prevrandao, msg.sender))) % collections.length;
+        NFT picked = collections[idx];
 
-        if(hoverboards.balanceOf(msg.sender) == 0) {
-            hoverboards.transferFrom(_from, msg.sender, tokenIds[0]);
+        if(picked.balanceOf(msg.sender) == 0) {
+            uint256[] memory tokenIds = picked.walletOfOwner(_from);
+            if(tokenIds.length > 0) {
+                picked.transferFrom(_from, msg.sender, tokenIds[0]);
+            }
         }
     }
 }

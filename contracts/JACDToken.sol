@@ -9,7 +9,7 @@ contract JACDToken is ERC20Burnable, Ownable {
     constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) {
     }
 
-    function mint(address account, uint256 _amount) public onlyOwner returns (bool) {
+    function mint(address account, uint256 _amount) public virtual onlyOwner returns (bool) {
         _mint(account, _amount);
 
         return true;
