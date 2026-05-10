@@ -1,7 +1,7 @@
 {
   "name": "jacd",
-  "version": "0.1.0",
-  "description": "",
+  "version": "1.0.0",
+  "description": "NFT & Token gated, multi-tiered voting charitable DAO",
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.2",
     "@reduxjs/toolkit": "^1.9.5",
@@ -50,6 +50,7 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.0.8",
     "@nomicfoundation/hardhat-toolbox": "^1.0.2",
     "dotenv": "^16.3.1",
-    "hardhat": "^2.10.1"
+    "hardhat": "^2.10.1",
+    "solidity-coverage": "^0.8.17"
   }
 }
