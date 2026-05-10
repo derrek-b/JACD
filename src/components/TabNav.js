@@ -23,6 +23,12 @@ const TabNav = () => {
       <LinkContainer to='/history' >
          <Nav.Link className='mx-2' >History</Nav.Link>
       </LinkContainer>
+      <LinkContainer to='/demo_video' >
+         <Nav.Link className='mx-2 text-danger'>Demo Video</Nav.Link>
+      </LinkContainer>
+      <LinkContainer to='/faucets' >
+         <Nav.Link className='mx-2 text-danger'>Faucets</Nav.Link>
+      </LinkContainer>
     </Nav>
   )
 }

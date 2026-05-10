@@ -9,7 +9,8 @@ import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import InputGroup from 'react-bootstrap/InputGroup'
 import Spinner from 'react-bootstrap/Spinner'
-import Alert from 'react-bootstrap/Alert'
+
+import { addToast } from '../store/reducers/toasts'
 
 import {
   loadUserBalances,
@@ -26,8 +27,6 @@ const Info = () => {
 
   const [amount, setAmount] = useState(0)
   const [isWaiting, setIsWaiting] = useState(0)
-  const [showAlert, setShowAlert] = useState(false)
-  const [depositSuccess, setDepositSuccess] = useState(false)
 
   const provider = useSelector((state) => state.provider.connection)
   const account = useSelector((state) => state.provider.account)
@@ -49,10 +48,8 @@ const Info = () => {
   const donateHandler = async (e) => {
     e.preventDefault()
     setIsWaiting(true)
-    setShowAlert(false)
 
     const success = await submitDonation(provider, dao, tokens, amount)
-    setDepositSuccess(success)
 
     await loadDAOBalances(tokens, dao, dispatch)
     await loadUserBalances(tokens, account, dispatch)
@@ -60,29 +57,15 @@ const Info = () => {
     setAmount(0)
     setIsWaiting(false)
 
-    setShowAlert(true)
+    dispatch(addToast({
+      message: success ? 'Donation submitted successfully.' : 'Donation submission failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
 /* #endregion */
 
   return(
-    <>
-      {showAlert && (
-        depositSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success' >
-            <Alert.Heading>Donation Submission</Alert.Heading>
-            <hr />
-            <p>Donation successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Donation Submission</Alert.Heading>
-            <hr />
-            <p>Donation failed!</p>
-          </Alert>
-        )
-      )}
-
-      <CardGroup className='mx-auto my-4' style={{maxWidth: '1000px'}}>
+    <CardGroup className='mx-auto my-4' style={{maxWidth: '1000px'}}>
         <Card style={{maxWidth: '500px'}}>
           <Card.Header as='h3' >DAO Info</Card.Header>
           <Card.Body>
@@ -152,7 +135,6 @@ const Info = () => {
           )}
         </Card>
       </CardGroup>
-    </>
   )
 }
 

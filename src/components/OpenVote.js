@@ -10,7 +10,8 @@ import Button from 'react-bootstrap/Button'
 import Modal from 'react-bootstrap/Modal'
 import Form from 'react-bootstrap/Form'
 import Spinner from 'react-bootstrap/Spinner'
-import Alert from 'react-bootstrap/Alert'
+
+import { addToast } from '../store/reducers/toasts'
 
 import {
   loadUserBalances,
@@ -39,11 +40,6 @@ const OpenVote = () => {
   const [votingClosed, setVotingClosed] = useState(null)
   const [selectedProposal, setSelectedProposal] = useState(null)
   const [isVoting, setIsVoting] = useState(false)
-  const [showVoteAlert, setShowVoteAlert] = useState(false)
-  const [voteSuccess, setVoteSuccess] = useState(false)
-  const [showFinalizeAlert, setShowFinalizeAlert] = useState(false)
-  const [finalizeSuccess, setFinalizeSuccess] = useState(false)
-  const [showNoVoteAlert, setShowNoVoteAlert] = useState(false)
 
 
   const provider = useSelector((state) => state.provider.connection)
@@ -52,9 +48,9 @@ const OpenVote = () => {
   const symbols = useSelector((state) => state.tokens.symbols)
   const balances = useSelector((state) => state.tokens.balances)
   const nftBalances = useSelector((state) => state.nfts.nftBalances)
+  const names = useSelector((state) => state.nfts.names)
   const dao = useSelector((state) => state.dao.contract)
-  const holdersWeight = useSelector((state) => state.dao.holdersWeight)
-  const totalHolderVotes = useSelector((state) => state.dao.holderVotes)
+  const holdersWeights = useSelector((state) => state.dao.holdersWeights)
   const votesToFinalize = useSelector((state) => state.dao.minVotesToFinalize)
   const openProposals = useSelector((state) => state.dao.openProposals)
   const holderOpenVoteStatus = useSelector((state) => state.dao.holderOpenVoteStatus)
@@ -80,9 +76,6 @@ const OpenVote = () => {
   }
 
   const showVoteModal = (e) => {
-    setShowVoteAlert(false)
-    setShowFinalizeAlert(false)
-    setShowNoVoteAlert(false)
     setShowModal(true)
     const proposal = e.target.value.split(',')
     setVoteStatusIndex(proposal[9])
@@ -106,14 +99,16 @@ const OpenVote = () => {
     }
 
     if(holderOpenVoteStatus[votedStatusIndex] && jacdVotes === 0) {
-      setShowNoVoteAlert(true)
+      dispatch(addToast({
+        message: 'No holder or JACD votes were submitted.',
+        variant: 'secondary'
+      }))
       dismissModal()
       setIsVoting(false)
       return
     }
 
     const success = await submitOpenVote(provider, dao, tokens, selectedProposal[0], voteFor, jacdVotes, dispatch)
-    setVoteSuccess(success)
 
     await loadUserBalances(tokens, account, dispatch)
     await loadDAOBalances(tokens, dao, dispatch)
@@ -123,15 +118,15 @@ const OpenVote = () => {
 
     dismissModal()
     setIsVoting(false)
-    setShowVoteAlert(true)
+
+    dispatch(addToast({
+      message: success ? 'Vote submitted successfully.' : 'Vote submission failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
 
   const finalizeHandler = async (e) => {
-    setShowVoteAlert(false)
-    setShowFinalizeAlert(false)
-
     const success = await finalizeProposal(provider, dao, e.target.value)
-    setFinalizeSuccess(success)
 
     const proposals = await loadProposals(dao, dispatch)
     const openProposals = await loadOpenProposals(proposals, dispatch)
@@ -140,7 +135,10 @@ const OpenVote = () => {
     await loadUserBalances(tokens, account, dispatch)
     await loadDAOBalances(tokens, dao, dispatch)
 
-    setShowFinalizeAlert(true)
+    dispatch(addToast({
+      message: success ? 'Open stage finalized.' : 'Finalization failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
 /* #endregion */
 
@@ -150,12 +148,16 @@ const OpenVote = () => {
 
     const hasTokens = balances[0] > 0
     const totalNFTs = nftBalances.reduce((sum, b) => sum + +b, 0)
+    const weightedVotes = nftBalances.reduce(
+      (sum, b, i) => sum + (+b) * (+holdersWeights[i] || 0),
+      0
+    )
 
     setIsContributor(hasTokens)
     setIsHolder(totalNFTs > 0)
     setIsDAOMember(hasTokens || totalNFTs > 0)
-    setUserHolderVotes(totalNFTs * +holdersWeight)
-  }, [account, balances, nftBalances, holdersWeight])
+    setUserHolderVotes(weightedVotes)
+  }, [account, balances, nftBalances, holdersWeights])
 
   useEffect(() => {
     buildVotingClosed()
@@ -165,46 +167,6 @@ const OpenVote = () => {
 
   return(
     <>
-      {showVoteAlert && (
-        voteSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success'>
-            <Alert.Heading>Vote Submission</Alert.Heading>
-            <hr />
-            <p>Vote successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Vote Submission</Alert.Heading>
-            <hr />
-            <p>Vote failed!</p>
-          </Alert>
-        )
-      )}
-
-      {showFinalizeAlert && (
-        finalizeSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success'>
-            <Alert.Heading>Finalize Open Stage</Alert.Heading>
-            <hr />
-            <p>Finalization successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Finalize Open Stage</Alert.Heading>
-            <hr />
-            <p>Finalization failed!</p>
-          </Alert>
-        )
-      )}
-
-      {showNoVoteAlert && (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='secondary'>
-            <Alert.Heading>Vote Not Submitted</Alert.Heading>
-            <hr />
-            <p>No holder or JACD votes were submitted.</p>
-          </Alert>
-      )}
-
       <Card className='my-4'>
         <Card.Header as='h3' >Open Voting Proposals</Card.Header>
         {account ? (
@@ -265,11 +227,13 @@ const OpenVote = () => {
         )}
         <Card.Footer>
           <Card.Subtitle>Holder Voting Specifications</Card.Subtitle>
-          <Card.Text>
-            Votes per NFT held: {holdersWeight}
-            <br />
-            Total holder votes: {totalHolderVotes * holdersWeight}
-            <br />
+          <Card.Text as='div'>
+            Votes per NFT held by collection:
+            <ul className='mb-2'>
+              {names.map((name, i) => (
+                <li key={i}>{name}: {holdersWeights[i]}</li>
+              ))}
+            </ul>
             Minimum votes submitted to pass proposal: {ethers.utils.formatUnits(votesToFinalize.toString(), 'ether')}
           </Card.Text>
         </Card.Footer>

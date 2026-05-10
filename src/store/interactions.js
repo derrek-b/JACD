@@ -25,7 +25,7 @@ import {
   setUSDCBalance,
   setJACDSupply,
   setMaxProposalAmountPercent,
-  setHoldersWeight,
+  setHoldersWeights,
   setHolderVotes,
   setMinHolderVotesToPass,
   setMinVotesToFinalize,
@@ -108,7 +108,8 @@ export const loadDAOContract = async (tokens, chainId, provider, dispatch) => {
   dispatch(setContract(dao))
   dispatch(setMaxProposalAmountPercent((await dao.maxProposalAmountPercent()).toString()))
   dispatch(setHolderVotes((await dao.holderVotes()).toString()))
-  dispatch(setHoldersWeight((await dao.holdersWeight()).toString()))
+  const weights = await dao.getHoldersWeights()
+  dispatch(setHoldersWeights(weights.map(w => w.toString())))
   dispatch(setMinHolderVotesToPass((await dao.minHolderVotesToPass()).toString()))
   dispatch(setMinVotesToFinalize((await dao.minVotesToFinalize()).toString()))
   return dao
@@ -335,15 +336,10 @@ export const finalizeProposal = async (provider, dao, index) => {
 
 export const faucetRequest = async (provider, chainId, dao) => {
   try {
-    let transaction
-
     const signer = provider.getSigner()
-    console.log(1)
-
-    transaction = await dao.connect(signer).faucetRequest(config[chainId].manager.address)
-    await transaction.wait()
-    console.log(2)
-
+    const transaction = await dao.connect(signer).faucetRequest(config[chainId].manager.address)
+    const receipt = await transaction.wait()
+    return receipt
   } catch (error) {
     window.alert('Unable to complete faucet request')
   }

@@ -15,6 +15,8 @@ import HolderVote from './HolderVote'
 import OpenVote from './OpenVote'
 import History from './History'
 import Faucet from './Faucet'
+import DemoVideo from './DemoVideo'
+import ToastDisplay from './ToastDisplay'
 
 import {
   loadProvider,
@@ -97,6 +99,8 @@ function App() {
 
   return (
     <Container>
+      <ToastDisplay />
+
       {showAlert && (
         <Alert className='mx-auto my-5' style={{ maxWidth: '400px' }} dismissible variant='danger' >
           <Alert.Heading>Wrong Network</Alert.Heading>
@@ -125,10 +129,10 @@ function App() {
               <Route path='/holder_voting' element={<HolderVote />}></Route>
               <Route path='/open_voting' element={<OpenVote />}></Route>
               <Route path='/history' element={<History />}></Route>
+              <Route path='/faucets' element={<Faucet />}></Route>
+              <Route path='/demo_video' element={<DemoVideo />}></Route>
             </Routes>
           )}
-
-          <Faucet />
         </HashRouter>
       ) : (
         <div className='text-center my-5'>

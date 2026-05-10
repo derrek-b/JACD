@@ -9,7 +9,8 @@ import Countdown from 'react-countdown'
 import Button from 'react-bootstrap/Button'
 import Modal from 'react-bootstrap/Modal'
 import Spinner from 'react-bootstrap/Spinner'
-import Alert from 'react-bootstrap/Alert'
+
+import { addToast } from '../store/reducers/toasts'
 
 import {
   loadProposals,
@@ -33,10 +34,6 @@ const HolderVote = () => {
   const [showModal, setShowModal] = useState(false)
   const [selectedProposal, setSelectedProposal] = useState(null)
   const [isVoting, setIsVoting] = useState(false)
-  const [showVoteAlert, setShowVoteAlert] = useState(false)
-  const [voteSuccess, setVoteSuccess] = useState(false)
-  const [showFinalizeAlert, setShowFinalizeAlert] = useState(false)
-  const [finalizeSuccess, setFinalizeSuccess] = useState(false)
 
   const provider = useSelector((state) => state.provider.connection)
   const account = useSelector((state) => state.provider.account)
@@ -70,8 +67,6 @@ const HolderVote = () => {
   }
 
   const showVoteModal = (e) => {
-    setShowVoteAlert(false)
-    setShowFinalizeAlert(false)
     setShowModal(true)
     const proposal = e.target.value.split(',')
     setSelectedProposal(proposal)
@@ -94,7 +89,6 @@ const HolderVote = () => {
     }
 
     const success = await submitHoldersVote(provider, dao, selectedProposal[0], voteFor)
-    setVoteSuccess(success)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
@@ -102,15 +96,15 @@ const HolderVote = () => {
 
     dismissModal()
     setIsVoting(false)
-    setShowVoteAlert(true)
+
+    dispatch(addToast({
+      message: success ? 'Vote submitted successfully.' : 'Vote submission failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
 
   const finalizeHandler = async (e) => {
-    setShowVoteAlert(false)
-    setShowFinalizeAlert(false)
-
     const success = await finalizeHoldersVote(provider, dao, e.target.value)
-    setFinalizeSuccess(success)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
@@ -119,7 +113,10 @@ const HolderVote = () => {
     await loadHolderOpenVoteStatus(dao, openProposals, account, dispatch)
     await loadClosedProposals(proposals, dispatch)
 
-    setShowFinalizeAlert(true)
+    dispatch(addToast({
+      message: success ? 'Holder stage finalized.' : 'Finalization failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
   /* #endregion */
 
@@ -133,38 +130,6 @@ const HolderVote = () => {
 
   return(
     <>
-      {showVoteAlert && (
-        voteSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success'>
-            <Alert.Heading>Vote Submission</Alert.Heading>
-            <hr />
-            <p>Vote successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Vote Submission</Alert.Heading>
-            <hr />
-            <p>Vote failed!</p>
-          </Alert>
-        )
-      )}
-
-      {showFinalizeAlert && (
-        finalizeSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success'>
-            <Alert.Heading>Finalize Holder Stage</Alert.Heading>
-            <hr />
-            <p>Finalization successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Finalize Holder Stage</Alert.Heading>
-            <hr />
-            <p>Finalization failed!</p>
-          </Alert>
-        )
-      )}
-
       <Card className='my-4'>
         <Card.Header as='h3' >Holding Voting Proposals</Card.Header>
         {account ? (

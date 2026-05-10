@@ -3,9 +3,9 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { useState, useEffect } from 'react'
 
+import Card from 'react-bootstrap/Card'
 import Button from 'react-bootstrap/Button'
-
-import demo from '../demo_vid.mp4'
+import Alert from 'react-bootstrap/Alert'
 
 import config from '../config.json'
 
@@ -24,6 +24,8 @@ const Faucet = () => {
 
   const [canClaim, setCanClaim] = useState(true)
   const [isClaiming, setIsClaiming] = useState(false)
+  const [showAlert, setShowAlert] = useState(false)
+  const [alertMessage, setAlertMessage] = useState('')
 
   const provider = useSelector((state) => state.provider.connection)
   const chainId = useSelector((state) => state.provider.chainId)
@@ -34,17 +36,41 @@ const Faucet = () => {
   const dao = useSelector((state) => state.dao.contract)
   const nfts = useSelector((state) => state.nfts.collections)
   const nftBalances = useSelector((state) => state.nfts.nftBalances)
+  const names = useSelector((state) => state.nfts.names)
   /* #endregion */
 
   /* #region Component Functions */
 
   const claimHandler = async () => {
     setIsClaiming(true)
+    setShowAlert(false)
 
-    await faucetRequest(provider, chainId, dao)
+    const receipt = await faucetRequest(provider, chainId, dao)
 
     await loadUserBalances(tokens, account, dispatch)
     await loadNFTBalances(nfts, account, dispatch)
+
+    const event = receipt?.events?.find(e => e.event === 'FaucetClaim')
+    if (event) {
+      const idx = event.args.collectionIdx.toNumber()
+      const tokenId = event.args.tokenId.toNumber()
+      const usdcAmt = event.args.usdcAmount.toNumber() / 10**6
+      const singular = (names[idx] || 'NFT').replace(/s$/, '')
+
+      let message
+      if (tokenId > 0 && usdcAmt > 0) {
+        message = `Claimed ${usdcAmt} mUSDC and 1 ${singular} (token #${tokenId}).`
+      } else if (tokenId > 0) {
+        message = `Already at 100 mUSDC.  Claimed 1 ${singular} (token #${tokenId}).`
+      } else if (usdcAmt > 0) {
+        message = `Claimed ${usdcAmt} mUSDC.  ${singular} already minted — re-claim for a chance at a different type.`
+      } else {
+        message = `Already at 100 mUSDC.  ${singular} already minted — re-claim for a chance at a different type.`
+      }
+
+      setAlertMessage(message)
+      setShowAlert(true)
+    }
 
     setIsClaiming(false)
   }
@@ -55,59 +81,65 @@ const Faucet = () => {
 
   useEffect(() => {
     if (!account) return
-    const hasEnough = balances[1] >= 100 && nftBalances[1] > 0
+    const hasEnough = balances[1] >= 100 && nftBalances.length > 0 && nftBalances.every(b => +b > 0)
     setCanClaim(!hasEnough)
   }, [account, balances, nftBalances])
+
+  useEffect(() => {
+    if (!showAlert) return
+    const id = setTimeout(() => setShowAlert(false), 10000)
+    return () => clearTimeout(id)
+  }, [showAlert])
   /* #endregion */
 
   return(
-    <>
-      {account && (
-        <>
-          <hr />
+    <Card className='my-4 mx-auto' style={{ maxWidth: '600px' }}>
+      <Card.Header as='h3'>Faucets</Card.Header>
+      <Card.Body>
+        {showAlert && (
+          <Alert variant='success' onClose={() => setShowAlert(false)} dismissible>
+            {alertMessage}
+          </Alert>
+        )}
 
-          <div className='my-2' style={{ width: '700px', float: 'left' }}>
-            <p className='d-inline-block mx-3' ><strong>{`Claim ${symbols[1]} & NFT assets for app testing`}</strong></p>
+        <p><strong>{`Claim mUSDC + a random NFT${names.length ? ` (${names.join(', ')})` : ''}.`}</strong></p>
 
-            {isClaiming ? (
-              <Button disabled>Claiming...</Button>
-            ) : (
-              canClaim ? (
-                <Button onClick={claimHandler}>Claim Assets</Button>
-              ) : (
-                <Button disabled>Assets Claimed</Button>
-              )
-            )}
+        {!account ? (
+          <Button disabled>Connect Wallet to Claim</Button>
+        ) : isClaiming ? (
+          <Button disabled>Claiming...</Button>
+        ) : canClaim ? (
+          <Button onClick={claimHandler}>Claim Assets</Button>
+        ) : (
+          <Button disabled>Assets Claimed</Button>
+        )}
 
-            <br />
-            <br />
+        <hr />
 
-            <strong className='mx-3' >Sepolia Testnet Ether Faucets</strong>
-            <ul className='ms-3'>
-              <li><a target="_blank" rel='noreferrer' href='https://sepoliafaucet.com'>Alchemy</a></li>
-              <li><a target="_blank" rel='noreferrer' href='https://faucet.quicknode.com/ethereum/sepolia'>QuickNode</a></li>
-              <li><a target="_blank" rel='noreferrer' href='https://www.infura.io/faucet/sepolia'>Infura</a></li>
-            </ul>
+        <strong>Sepolia Testnet Ether Faucets</strong>
+        <ul className='ms-3'>
+          <li><a target="_blank" rel='noreferrer' href='https://cloud.google.com/application/web3/faucet/ethereum/sepolia'>Google</a> — 0.05 ETH, no requirements</li>
+          <li><a target="_blank" rel='noreferrer' href='https://www.alchemy.com/faucets/ethereum-sepolia'>Alchemy</a> — 0.1 ETH, balance & activity requirements</li>
+          <li><a target="_blank" rel='noreferrer' href='https://faucets.chain.link/sepolia'>Chainlink</a> — 0.5 ETH, 1 LINK on mainnet required</li>
+        </ul>
 
-            <br />
+        {account && (
+          <>
+            <hr />
 
-            <strong className='mx-3'>Token Addresses</strong>
+            <strong>Token Addresses</strong>
             <ul className='ms-3'>
               <li><span className='underline'>{symbols[1]}: </span>{config[chainId].usdcToken.address}</li>
               <li><span className='underline'>{symbols[0]}: </span>{config[chainId].jacdToken.address}</li>
+              <li><span className='underline'>Jetpacks: </span>{config[chainId].jetpacks.address}</li>
+              <li><span className='underline'>Hoverboards: </span>{config[chainId].hoverboards.address}</li>
+              <li><span className='underline'>AVAs: </span>{config[chainId].avas.address}</li>
             </ul>
-          </div>
-        </>
-      )}
-
-      <div className='mb-3' style={{ float: 'right' }}>
-        <h3 className='text-center'><strong>Demo Video</strong></h3>
-        <video controls height={281} width={500} style={{ border: '1px solid black' }}>
-          <source src={demo} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    </>
+            <small className='text-muted'>NFT imports also require the token ID — shown in the claim alert when you receive one, or visible on Etherscan from the claim transaction.</small>
+          </>
+        )}
+      </Card.Body>
+    </Card>
   )
 }
 

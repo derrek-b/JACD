@@ -8,7 +8,8 @@ import Form from 'react-bootstrap/Form'
 import Button from 'react-bootstrap/Button'
 import InputGroup from 'react-bootstrap/InputGroup'
 import Spinner from 'react-bootstrap/Spinner'
-import Alert from 'react-bootstrap/Alert'
+
+import { addToast } from '../store/reducers/toasts'
 
 import {
   createProposal,
@@ -29,8 +30,6 @@ const Info = () => {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isWaiting, setIsWaiting] = useState(false)
-  const [showAlert, setShowAlert] = useState(false)
-  const [proposalSuccess, setProposalSuccess] = useState(false)
 
   const provider = useSelector((state) => state.provider.connection)
   const account = useSelector((state) => state.provider.account)
@@ -47,10 +46,8 @@ const Info = () => {
   const submitHandler = async (e) => {
     e.preventDefault()
     setIsWaiting(true)
-    setShowAlert(false)
 
     const success = await createProposal(provider, dao, recipient, amount, name, description, dispatch)
-    setProposalSuccess(success)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
@@ -61,7 +58,11 @@ const Info = () => {
     setName('')
     setDescription('')
     setIsWaiting(false)
-    setShowAlert(true)
+
+    dispatch(addToast({
+      message: success ? 'Proposal submitted successfully.' : 'Proposal submission failed.',
+      variant: success ? 'success' : 'danger'
+    }))
   }
   /* #endregion */
 
@@ -77,24 +78,7 @@ const Info = () => {
   /* #endregion */
 
   return(
-    <>
-      {showAlert && (
-        proposalSuccess ? (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='success'>
-            <Alert.Heading>Proposal Submission</Alert.Heading>
-            <hr />
-            <p>Submission successful!</p>
-          </Alert>
-        ) : (
-          <Alert className='mx-auto my-4' style={{ maxWidth: '400px' }} dismissible variant='danger'>
-            <Alert.Heading>Proposal Submission</Alert.Heading>
-            <hr />
-            <p>Submission failed!</p>
-          </Alert>
-        )
-      )}
-
-      <Card className='my-4 mx-auto' style={{maxWidth: '500px', minHeight: '300px'}}>
+    <Card className='my-4 mx-auto' style={{maxWidth: '500px', minHeight: '300px'}}>
         <Card.Header as='h3' >New Proposals</Card.Header>
         {account ? (
           isDAOMember ? (
@@ -159,8 +143,7 @@ const Info = () => {
         ) : (
           <Card.Body>Please connect your wallet</Card.Body>
         )}
-      </Card>
-    </>
+    </Card>
   )
 }
 

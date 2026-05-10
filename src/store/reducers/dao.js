@@ -7,7 +7,7 @@ export const dao = createSlice({
     usdcBalance: 0,
     jacdSupply: 0,
     maxProposalAmountPercent: 0,
-    holdersWeight: 0,
+    holdersWeights: [],
     holderVotes: 0,
     minHolderVotesToPass: 0,
     minVotesToFinalize: 0,
@@ -31,8 +31,8 @@ export const dao = createSlice({
     setMaxProposalAmountPercent: (state, action) => {
       state.maxProposalAmountPercent = action.payload
     },
-    setHoldersWeight: (state, action) => {
-      state.holdersWeight = action.payload
+    setHoldersWeights: (state, action) => {
+      state.holdersWeights = action.payload
     },
     setHolderVotes: (state, action) => {
       state.holderVotes = action.payload
@@ -69,7 +69,7 @@ export const {
   setUSDCBalance,
   setJACDSupply,
   setMaxProposalAmountPercent,
-  setHoldersWeight,
+  setHoldersWeights,
   setHolderVotes,
   setMinHolderVotesToPass,
   setMinVotesToFinalize,
