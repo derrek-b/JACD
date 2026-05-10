@@ -7,6 +7,8 @@ import Button from 'react-bootstrap/Button'
 
 import demo from '../demo_vid.mp4'
 
+import config from '../config.json'
+
 import {
   loadUserBalances,
   loadNFTBalances,
@@ -91,8 +93,8 @@ const Faucet = () => {
 
             <strong className='mx-3'>Token Addresses</strong>
             <ul className='ms-3'>
-              <li><span className='underline'>mUSDC: </span>0xA0B5DACf8a20F7Fd8B561b585148123c8705b4f1</li>
-              <li><span className='underline'>JACD: </span>0xa787F9Ef5e6E80b93F92E68c3007Fa8b6cE1Aa22</li>
+              <li><span className='underline'>{symbols[1]}: </span>{config[chainId].usdcToken.address}</li>
+              <li><span className='underline'>{symbols[0]}: </span>{config[chainId].jacdToken.address}</li>
             </ul>
           </div>
         </>
