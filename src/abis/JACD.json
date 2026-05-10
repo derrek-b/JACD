@@ -22,9 +22,9 @@
         "type": "uint8"
       },
       {
-        "internalType": "uint256",
-        "name": "_holdersWeight",
-        "type": "uint256"
+        "internalType": "uint256[]",
+        "name": "_holdersWeights",
+        "type": "uint256[]"
       },
       {
         "internalType": "uint256",
@@ -78,6 +78,37 @@
       }
     ],
     "name": "Deposit",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "claimer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "collectionIdx",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "usdcAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FaucetClaim",
     "type": "event"
   },
   {
@@ -204,6 +235,19 @@
     "type": "event"
   },
   {
+    "inputs": [],
+    "name": "VERSION",
+    "outputs": [
+      {
+        "internalType": "string",
+        "name": "",
+        "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -316,6 +360,19 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getHoldersWeights",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -408,8 +465,14 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "holdersWeight",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "holdersWeights",
     "outputs": [
       {
         "internalType": "uint256",

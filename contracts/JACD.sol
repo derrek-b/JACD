@@ -6,6 +6,8 @@ import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import './NFT.sol';
 
 contract JACD {
+    string public constant VERSION = "1.0.0";
+
     JACDToken public jacdToken;
     IERC20 public usdcToken;
 
@@ -72,6 +74,13 @@ contract JACD {
         VoteStage stage,
         uint256 votesFor,
         uint256 votesAgainst
+    );
+
+    event FaucetClaim(
+        address indexed claimer,
+        uint256 collectionIdx,
+        uint256 tokenId,
+        uint256 usdcAmount
     );
 
     modifier holdersOrContributors {
@@ -382,18 +391,24 @@ contract JACD {
         int256 requestAmount = (100 * 10**6) - int256(usdcToken.balanceOf(msg.sender));
         require(requestAmount <= int256(usdcToken.balanceOf(_from)), 'JACD: not enough remaining USDC for faucet');
 
+        uint256 usdcTransferred = 0;
         if(requestAmount > 0) {
             usdcToken.transferFrom(_from, msg.sender, uint256(requestAmount));
+            usdcTransferred = uint256(requestAmount);
         }
 
         uint256 idx = uint256(keccak256(abi.encodePacked(block.prevrandao, msg.sender))) % collections.length;
         NFT picked = collections[idx];
 
+        uint256 transferredTokenId = 0;
         if(picked.balanceOf(msg.sender) == 0) {
             uint256[] memory tokenIds = picked.walletOfOwner(_from);
             if(tokenIds.length > 0) {
                 picked.transferFrom(_from, msg.sender, tokenIds[0]);
+                transferredTokenId = tokenIds[0];
             }
         }
+
+        emit FaucetClaim(msg.sender, idx, transferredTokenId, usdcTransferred);
     }
 }

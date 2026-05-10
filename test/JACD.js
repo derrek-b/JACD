@@ -1,6 +1,7 @@
 const { expect } = require('chai')
 const { ethers } = require('hardhat')
 const { time } = require('@nomicfoundation/hardhat-network-helpers')
+const { anyValue } = require('@nomicfoundation/hardhat-chai-matchers/withArgs')
 
 const tokens = (amount) => {
   return ethers.utils.parseUnits(amount.toString(), 'ether')
@@ -895,6 +896,12 @@ describe('JACD', () => {
         expect(await totalNftBalance(rando.address)).to.equal(1)
       })
 
+      it('emits FaucetClaim with usdcAmount and tokenId when both are given', async () => {
+        await expect(transaction)
+          .to.emit(jacdDAO, 'FaucetClaim')
+          .withArgs(rando.address, anyValue, 1, usdc(100))
+      })
+
       it('transfers just enough USDC so requestor has 100', async () => {
         transaction = await usdcToken.connect(rando).approve(jacdDAO.address, usdc(50))
         await transaction.wait()
@@ -925,6 +932,40 @@ describe('JACD', () => {
         await transaction.wait()
 
         expect(await totalNftBalance(rando.address)).to.equal(3)
+      })
+
+      it('emits FaucetClaim with tokenId>0 and usdcAmount=0 when requester is at 100 USDC but missing the rolled NFT', async () => {
+        for (const nft of [jetpacks, hoverboards, avas]) {
+          const tokenIds = await nft.walletOfOwner(rando.address)
+          if (tokenIds.length === 0) continue
+
+          transaction = await nft.connect(rando).transferFrom(rando.address, deployer.address, tokenIds[0])
+          await transaction.wait()
+        }
+
+        transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
+
+        await expect(transaction)
+          .to.emit(jacdDAO, 'FaucetClaim')
+          .withArgs(rando.address, anyValue, 1, 0)
+      })
+
+      it('emits FaucetClaim with tokenId=0 and usdcAmount=0 when requester is fully topped up', async () => {
+        for (const nft of [jetpacks, hoverboards, avas]) {
+          if ((await nft.balanceOf(rando.address)).toNumber() > 0) continue
+
+          transaction = await nft.connect(deployer).addToWhitelist(rando.address)
+          await transaction.wait()
+
+          transaction = await nft.connect(rando).mint(1, { value: ether(.01) })
+          await transaction.wait()
+        }
+
+        transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
+
+        await expect(transaction)
+          .to.emit(jacdDAO, 'FaucetClaim')
+          .withArgs(rando.address, anyValue, 0, 0)
       })
     })
 
@@ -957,6 +998,20 @@ describe('JACD', () => {
 
         expect(await usdcToken.balanceOf(rando.address)).to.equal(usdc(100))
         expect(await totalNftBalance(rando.address)).to.equal(nftsBefore)
+      })
+
+      it('emits FaucetClaim with tokenId=0 and usdcAmount=100 when source has no NFTs', async () => {
+        transaction = await usdcToken.connect(deployer).mint(deployer.address, usdc(100))
+        await transaction.wait()
+
+        transaction = await usdcToken.connect(deployer).approve(jacdDAO.address, usdc(100))
+        await transaction.wait()
+
+        transaction = await jacdDAO.connect(rando).faucetRequest(deployer.address)
+
+        await expect(transaction)
+          .to.emit(jacdDAO, 'FaucetClaim')
+          .withArgs(rando.address, anyValue, 0, usdc(100))
       })
     })
   })
