@@ -47,14 +47,10 @@ async function main() {
 
   const hoverboards = await hre.ethers.getContractAt('NFT', config[chainId].hoverboards.address)
 
-  transaction = await hoverboards.connect(deployer).addToWhitelist(holder1.address)
-  await transaction.wait()
-  transaction = await hoverboards.connect(deployer).addToWhitelist(holder2.address)
+  transaction = await hoverboards.connect(deployer).addToWhitelist(deployer.address)
   await transaction.wait()
 
-  transaction = await hoverboards.connect(holder1).mint(1, { value: ether(.001) })
-  await transaction.wait()
-  transaction = await hoverboards.connect(holder2).mint(1, { value: ether(.001) })
+  transaction = await hoverboards.connect(deployer).mint(1, { value: ether(.001) })
   await transaction.wait()
 
   console.log('minting avas...')
@@ -63,16 +59,8 @@ async function main() {
 
   transaction = await avas.connect(deployer).addToWhitelist(deployer.address)
   await transaction.wait()
-  transaction = await avas.connect(deployer).addToWhitelist(holder1.address)
-  await transaction.wait()
-  transaction = await avas.connect(deployer).addToWhitelist(holder2.address)
-  await transaction.wait()
 
   transaction = await avas.connect(deployer).mint(1, { value: ether(.001) })
-  await transaction.wait()
-  transaction = await avas.connect(holder1).mint(1, { value: ether(.001) })
-  await transaction.wait()
-  transaction = await avas.connect(holder2).mint(1, { value: ether(.001) })
   await transaction.wait()
 
   console.log('deposit usdc...')
@@ -89,6 +77,18 @@ async function main() {
   transaction = await dao.connect(contributor1).receiveDeposit(usdc(900))
   await transaction.wait()
 
+  console.log('approving DAO for faucet draws...')
+
+  transaction = await usdcToken.connect(deployer).approve(dao.address, usdc(500))
+  await transaction.wait()
+
+  transaction = await jetpacks.connect(deployer).setApprovalForAll(dao.address, true)
+  await transaction.wait()
+  transaction = await hoverboards.connect(deployer).setApprovalForAll(dao.address, true)
+  await transaction.wait()
+  transaction = await avas.connect(deployer).setApprovalForAll(dao.address, true)
+  await transaction.wait()
+
   console.log('creating proposals...')
 
   transaction = await dao.connect(deployer).createProposal(deployer.address, usdc(100), 'Proposal 1', 'Description of Proposal 1')
@@ -102,19 +102,11 @@ async function main() {
 
   transaction = await dao.connect(deployer).holdersVote(1, true)
   await transaction.wait()
-  transaction = await dao.connect(holder1).holdersVote(1, true)
-  await transaction.wait()
-  transaction = await dao.connect(holder2).holdersVote(1, true)
+
+  transaction = await dao.connect(deployer).holdersVote(2, true)
   await transaction.wait()
 
-  transaction = await dao.connect(holder1).holdersVote(2, true)
-  await transaction.wait()
-  transaction = await dao.connect(holder2).holdersVote(2, false)
-  await transaction.wait()
-
-  transaction = await dao.connect(holder1).holdersVote(3, false)
-  await transaction.wait()
-  transaction = await dao.connect(holder2).holdersVote(3, false)
+  transaction = await dao.connect(deployer).holdersVote(3, false)
   await transaction.wait()
 
   console.log('passing holder vote stage...')
@@ -126,10 +118,10 @@ async function main() {
 
   const jacdToken = await hre.ethers.getContractAt('JACDToken', config[chainId].jacdToken.address)
 
-  transaction = await jacdToken.connect(contributor1).approve(dao.address, tokens(300))
+  transaction = await jacdToken.connect(contributor1).approve(dao.address, tokens(250))
   await transaction.wait()
 
-  transaction = await dao.connect(contributor1).openVote(1, true, votes(300))
+  transaction = await dao.connect(contributor1).openVote(1, true, votes(250))
   await transaction.wait()
 
   console.log('finished!')

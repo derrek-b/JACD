@@ -1,54 +1,54 @@
 {
-  "31337" : {
-    "jacdToken" : {
-      "address" : "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  "31337": {
+    "jacdToken": {
+      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
     },
-    "jacdDAO" : {
-      "address" : "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+    "jacdDAO": {
+      "address": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
     },
-    "usdcToken" : {
-      "address" : "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+    "usdcToken": {
+      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
     },
-    "jetpacks" : {
-      "address" : "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+    "jetpacks": {
+      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
-    "hoverboards" : {
-      "address" : "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+    "hoverboards": {
+      "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
     },
-    "avas" : {
-      "address" : "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+    "avas": {
+      "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
     },
-    "deployer" : {
-      "address" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+    "deployer": {
+      "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
     },
-    "manager" : {
-      "address" : "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+    "manager": {
+      "address": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
     }
   },
-  "11155111" : {
-    "jacdToken" : {
-      "address" : "0xa787F9Ef5e6E80b93F92E68c3007Fa8b6cE1Aa22"
+  "11155111": {
+    "jacdToken": {
+      "address": "0xa787F9Ef5e6E80b93F92E68c3007Fa8b6cE1Aa22"
     },
-    "jacdDAO" : {
-      "address" : "0x0F538bF2C11908AA68b3c07b8DdF54cc7e2202fd"
+    "jacdDAO": {
+      "address": "0x0F538bF2C11908AA68b3c07b8DdF54cc7e2202fd"
     },
-    "usdcToken" : {
+    "usdcToken": {
       "address": "0xA0B5DACf8a20F7Fd8B561b585148123c8705b4f1"
     },
-    "jetpacks" : {
-      "address" : "0xC4A361085BF7e6461b9eb532401BC650339e7966"
+    "jetpacks": {
+      "address": "0xC4A361085BF7e6461b9eb532401BC650339e7966"
     },
-    "hoverboards" : {
-      "address" : "0xB7724B9575d9174e646fE55EF3689b845cA460BC"
+    "hoverboards": {
+      "address": "0xB7724B9575d9174e646fE55EF3689b845cA460BC"
     },
-    "avas" : {
-      "address" : "0xA1E5350b6d894e49726B856C0F342dfa18215125"
+    "avas": {
+      "address": "0xA1E5350b6d894e49726B856C0F342dfa18215125"
     },
-    "deployer" : {
-      "address" : "0x505f182A86EA667860B82A61Fa67c1927A2Ff92f"
+    "deployer": {
+      "address": "0x505f182A86EA667860B82A61Fa67c1927A2Ff92f"
     },
-    "manager" : {
-      "address" : "0x64b1b1d16b31462fa12b87d59d53b689ee0c32ff"
+    "manager": {
+      "address": "0x64b1b1d16b31462fa12b87d59d53b689ee0c32ff"
     }
   }
 }

@@ -5,6 +5,8 @@
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
 const hre = require("hardhat")
+const fs = require('fs')
+const path = require('path')
 
 const tokens = (amount) => {
   return ethers.utils.parseUnits(amount.toString(), 'ether')
@@ -20,7 +22,7 @@ async function main() {
   console.log(`JACD Coin deployed to ${jacdToken.address}`)
 
   const USDCToken = await hre.ethers.getContractFactory('USDCToken')
-  const usdcToken = await USDCToken.deploy('USD Coin', 'USDC', 0)
+  const usdcToken = await USDCToken.deploy('Mock USD Coin', 'mUSDC', 0)
 
   console.log(`USDC Coin deployed to ${usdcToken.address}`)
 
@@ -42,10 +44,10 @@ async function main() {
     'Hoverboards',
     'HB',
     ether(.001),
-    2,
+    1,
     Date.now().toString().slice(0, 10),
     'y',
-    2
+    1
   )
 
   console.log(`Hoverboards deployed to ${hoverboards.address}`)
@@ -55,10 +57,10 @@ async function main() {
     'AVAs',
     'AVA',
     ether(.001),
-    3,
+    1,
     Date.now().toString().slice(0, 10),
     'z',
-    3
+    1
   )
 
   console.log(`AVAs deployed to ${avas.address}`)
@@ -66,7 +68,7 @@ async function main() {
   const collections = [jetpacks.address, hoverboards.address, avas.address]
 
   const JACD = await hre.ethers.getContractFactory('JACD')
-  const jacd = await JACD.deploy(jacdToken.address, usdcToken.address, collections, 10, 100, 6, 3, votes(300), 500, 600)
+  const jacd = await JACD.deploy(jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 3, 3, votes(300), 500, 600)
 
   console.log(`JACD deployed to ${jacd.address}`)
 
@@ -77,6 +79,23 @@ async function main() {
   await transaction.wait()
 
   console.log(`JACDToken ownership transferred to ${await jacdToken.owner()}`)
+
+  const { chainId } = await hre.ethers.provider.getNetwork()
+  const configPath = path.join(__dirname, '..', 'src', 'config.json')
+  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+
+  config[chainId] = {
+    ...config[chainId],
+    jacdToken:   { address: jacdToken.address },
+    jacdDAO:     { address: jacd.address },
+    usdcToken:   { address: usdcToken.address },
+    jetpacks:    { address: jetpacks.address },
+    hoverboards: { address: hoverboards.address },
+    avas:        { address: avas.address },
+  }
+
+  fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
+  console.log(`config.json updated for chainId ${chainId}`)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -42,56 +42,56 @@ async function main() {
 
   console.log('   USDC...')
 
-  transaction = await usdcToken.connect(deployer).mint(manager.address, usdc(1000000))
-  await transaction.wait()
-
-  transaction = await usdcToken.connect(deployer).mint(deployer.address, usdc(1000000))
+  transaction = await usdcToken.connect(deployer).mint(manager.address, usdc(5000))
   await transaction.wait()
 
   console.log('   Jetpacks...')
 
-  transaction = await jetpacks.connect(deployer).addToWhitelist(deployer.address)
+  transaction = await jetpacks.connect(deployer).addToWhitelist(manager.address)
   await transaction.wait()
 
-  for(let x = 0; x < 10; x++) {
-    transaction = await jetpacks.connect(deployer).mint(100, { value: ether(.01) })
-    await transaction.wait()
-  }
+  transaction = await jetpacks.connect(manager).mint(50, { value: ether(.0001).mul(50) })
+  await transaction.wait()
 
   console.log('   Hoverboards...')
 
   transaction = await hoverboards.connect(deployer).addToWhitelist(manager.address)
   await transaction.wait()
 
-  for(let x = 0; x < 10; x++) {
-    transaction = await hoverboards.connect(manager).mint(100, { value: ether(.01) })
-    await transaction.wait()
-  }
+  transaction = await hoverboards.connect(manager).mint(50, { value: ether(.0001).mul(50) })
+  await transaction.wait()
 
   console.log('   AVAs...')
 
-  transaction = await avas.connect(deployer).addToWhitelist(deployer.address)
+  transaction = await avas.connect(deployer).addToWhitelist(manager.address)
   await transaction.wait()
 
-  for(let x = 0; x < 10; x++) {
-    transaction = await avas.connect(deployer).mint(100, { value: ether(.01) })
-    await transaction.wait()
-  }
+  transaction = await avas.connect(manager).mint(50, { value: ether(.0001).mul(50) })
+  await transaction.wait()
 
   console.log('approve DAO to transfer assets...')
 
-  transaction = await usdcToken.connect(manager).approve(dao.address, usdc(1000000))
+  transaction = await usdcToken.connect(manager).approve(dao.address, usdc(5000))
+  await transaction.wait()
+
+  transaction = await jetpacks.connect(manager).setApprovalForAll(dao.address, true)
   await transaction.wait()
 
   transaction = await hoverboards.connect(manager).setApprovalForAll(dao.address, true)
   await transaction.wait()
 
-  console.log('deposit USDC...')
-
-  transaction = await usdcToken.connect(deployer).approve(dao.address, usdc(100000))
+  transaction = await avas.connect(manager).setApprovalForAll(dao.address, true)
   await transaction.wait()
 
-  transaction = await dao.connect(deployer).receiveDeposit(usdc(100000))
+  console.log('deposit USDC...')
+
+  transaction = await usdcToken.connect(deployer).mint(deployer.address, usdc(2000))
+  await transaction.wait()
+
+  transaction = await usdcToken.connect(deployer).approve(dao.address, usdc(2000))
+  await transaction.wait()
+
+  transaction = await dao.connect(deployer).receiveDeposit(usdc(2000))
   await transaction.wait()
 
   console.log('finished!')
