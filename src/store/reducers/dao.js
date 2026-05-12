@@ -5,6 +5,7 @@ export const dao = createSlice({
   initialState: {
     contract: null,
     usdcBalance: 0,
+    availableBalance: 0,
     jacdSupply: 0,
     maxProposalAmountPercent: 0,
     holdersWeights: [],
@@ -24,6 +25,9 @@ export const dao = createSlice({
     },
     setUSDCBalance: (state, action) => {
       state.usdcBalance = action.payload
+    },
+    setAvailableBalance: (state, action) => {
+      state.availableBalance = action.payload
     },
     setJACDSupply: (state, action) => {
       state.jacdSupply = action.payload
@@ -67,6 +71,7 @@ export const dao = createSlice({
 export const {
   setContract,
   setUSDCBalance,
+  setAvailableBalance,
   setJACDSupply,
   setMaxProposalAmountPercent,
   setHoldersWeights,

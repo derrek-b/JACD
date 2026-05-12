@@ -22,7 +22,12 @@ contract JACD {
     NFT[] public collections;
 
     uint256 public jacdSupply;
-    uint256 public usdcBalance;
+    // Invariant: availableBalance == usdcToken.balanceOf(this)
+    //   − Σ(amounts of proposals currently in {Holder, Open})
+    //   − Σ(amounts of proposals already Finalized and paid out, *not* re-counted)
+    // i.e. unencumbered funds available for new proposals. Reserved at createProposal,
+    // released on finalizeHoldersVote-fail or finalizeProposal-fail.
+    uint256 public availableBalance;
 
     uint256 public proposalCount;
     mapping(uint256 => Proposal) public proposals;
@@ -155,8 +160,6 @@ contract JACD {
         return collections.length;
     }
 
-    receive() external payable {}
-
     function receiveDeposit(uint256 _amount) public {
         require(_amount > 0, 'JACD: deposit amount of 0');
         require(
@@ -164,7 +167,7 @@ contract JACD {
             'JACD: USDC transfer failed'
         );
 
-        usdcBalance += _amount;
+        availableBalance += _amount;
 
         distributeTokens(msg.sender, _amount);
 
@@ -191,13 +194,15 @@ contract JACD {
         public
         holdersOrContributors
     {
-        uint256 maxAmount = (maxProposalAmountPercent * usdcBalance) / 100;
+        uint256 maxAmount = (maxProposalAmountPercent * availableBalance) / 100;
 
         require(_amount > 0, 'JACD: proposal amount of 0');
         require(_amount <= maxAmount, 'JACD: proposal exceeds limit');
         require(bytes(_name).length > 0, 'JACD: no proposal name');
         require(bytes(_description).length > 0, 'JACD: no proposal description');
         require(_recipient != address(0), 'JACD: invalid proposal recipient address');
+
+        availableBalance -= _amount;
 
         proposalCount++;
 
@@ -277,6 +282,7 @@ contract JACD {
             proposal.votesAgainst = 0;
             proposal.voteEnd = block.timestamp + openVoteTime;
         } else {
+            availableBalance += proposal.amount;
             proposal.stage = VoteStage.Failed;
         }
     }
@@ -323,7 +329,7 @@ contract JACD {
 
         require(block.timestamp > proposal.voteEnd, 'JACD: vote has not ended');
         require(
-            usdcToken.balanceOf(address(this)) > proposal.amount,
+            usdcToken.balanceOf(address(this)) >= proposal.amount,
             'JACD: insufficient USDC balance'
         );
 
@@ -332,7 +338,6 @@ contract JACD {
             proposal.votesFor + proposal.votesAgainst >= minVotesToFinalize
         ) {
             require(usdcToken.transfer(proposal.recipient, proposal.amount));
-            usdcBalance -= proposal.amount;
 
             emit VotePass(
                 proposal.index,
@@ -343,6 +348,7 @@ contract JACD {
 
             proposal.stage = VoteStage.Finalized;
         } else {
+            availableBalance += proposal.amount;
             proposal.stage = VoteStage.Failed;
         }
     }

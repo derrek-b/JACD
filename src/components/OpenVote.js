@@ -21,7 +21,8 @@ import {
   loadProposals,
   loadClosedProposals,
   submitOpenVote,
-  finalizeProposal
+  finalizeProposal,
+  resultToToast
 } from '../store/interactions'
 /* #endregion */
 
@@ -35,7 +36,7 @@ const OpenVote = () => {
   const [userHolderVotes, setUserHolderVotes] = useState(0)
   const [isContributor, setIsContributor] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [jacdVotes, setJACDVotes] = useState(0)
+  const [jacdVotes, setJACDVotes] = useState('')
   const [votedStatusIndex, setVoteStatusIndex] = useState(null)
   const [votingClosed, setVotingClosed] = useState(null)
   const [selectedProposal, setSelectedProposal] = useState(null)
@@ -84,7 +85,7 @@ const OpenVote = () => {
 
   const dismissModal = () => {
     setShowModal(false)
-    setJACDVotes(0)
+    setJACDVotes('')
   }
 
   const voteHandler = async (e) => {
@@ -98,7 +99,7 @@ const OpenVote = () => {
       voteFor = false
     }
 
-    if(holderOpenVoteStatus[votedStatusIndex] && jacdVotes === 0) {
+    if(holderOpenVoteStatus[votedStatusIndex] && !jacdVotes) {
       dispatch(addToast({
         message: 'No holder or JACD votes were submitted.',
         variant: 'secondary'
@@ -108,7 +109,16 @@ const OpenVote = () => {
       return
     }
 
-    const success = await submitOpenVote(provider, dao, tokens, selectedProposal[0], voteFor, jacdVotes, dispatch)
+    if (+jacdVotes > +balances[0]) {
+      dispatch(addToast({
+        message: `${jacdVotes} JACD votes exceeds your balance of ${balances[0]} ${symbols[0]}.`,
+        variant: 'danger'
+      }))
+      setIsVoting(false)
+      return
+    }
+
+    const result = await submitOpenVote(provider, dao, tokens, selectedProposal[0], voteFor, jacdVotes, dispatch)
 
     await loadUserBalances(tokens, account, dispatch)
     await loadDAOBalances(tokens, dao, dispatch)
@@ -116,17 +126,14 @@ const OpenVote = () => {
     const openProposals = await loadOpenProposals(proposals, dispatch)
     await loadHolderOpenVoteStatus(dao, openProposals, account, dispatch)
 
-    dismissModal()
+    if (result.ok) dismissModal()
     setIsVoting(false)
 
-    dispatch(addToast({
-      message: success ? 'Vote submitted successfully.' : 'Vote submission failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Vote submitted successfully.', 'Vote submission failed')))
   }
 
   const finalizeHandler = async (e) => {
-    const success = await finalizeProposal(provider, dao, e.target.value)
+    const result = await finalizeProposal(provider, dao, e.target.value)
 
     const proposals = await loadProposals(dao, dispatch)
     const openProposals = await loadOpenProposals(proposals, dispatch)
@@ -135,10 +142,7 @@ const OpenVote = () => {
     await loadUserBalances(tokens, account, dispatch)
     await loadDAOBalances(tokens, dao, dispatch)
 
-    dispatch(addToast({
-      message: success ? 'Open stage finalized.' : 'Finalization failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Open stage finalized.', 'Finalization failed')))
   }
 /* #endregion */
 
@@ -267,9 +271,9 @@ const OpenVote = () => {
                   step='any'
                   value={jacdVotes}
                   onChange={(e) => setJACDVotes(e.target.value)}
-                  max={balances[0]}
                   min={1}
                   required
+                  placeholder='Enter JACD votes'
                 />
               </Form.Group>
             </Form>

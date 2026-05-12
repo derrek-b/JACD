@@ -23,6 +23,7 @@ import {
 import {
   setContract,
   setUSDCBalance,
+  setAvailableBalance,
   setJACDSupply,
   setMaxProposalAmountPercent,
   setHoldersWeights,
@@ -48,6 +49,38 @@ import {
 
 const parseUSDC = (n) => {
   return n * 10**6
+}
+
+const extractRevertReason = (error) => {
+  // User rejection — different wallets / ethers versions surface this differently
+  const code = error?.code ?? error?.error?.code
+  if (code === 'ACTION_REJECTED' || code === 4001) return null
+
+  const candidates = [
+    error?.reason,
+    error?.error?.reason,
+    error?.error?.data?.message,
+    error?.data?.message,
+    error?.message,
+  ].filter(Boolean)
+
+  for (const candidate of candidates) {
+    // Hardhat VM exception: "...reverted with reason string 'Insufficient balance'"
+    const hhMatch = candidate.match(/reverted with reason string ['"]([^'"]+)['"]/)
+    if (hhMatch) return hhMatch[1]
+
+    // Generic ethers/OpenZeppelin: "execution reverted: <reason>"
+    const revertMatch = candidate.match(/execution reverted:?\s*(.+?)(?:\s*\(.*)?$/)
+    if (revertMatch && revertMatch[1].trim()) return revertMatch[1].trim()
+  }
+
+  return candidates[0] || 'Unknown error'
+}
+
+export const resultToToast = (result, successMessage, failurePrefix) => {
+  if (result.ok) return { message: successMessage, variant: 'success' }
+  if (result.reason === null) return { message: 'Cancelled.', variant: 'secondary' }
+  return { message: `${failurePrefix} — ${result.reason}`, variant: 'danger' }
 }
 
 const formatUSDC = (n) => {
@@ -117,11 +150,13 @@ export const loadDAOContract = async (tokens, chainId, provider, dispatch) => {
 
 export const loadDAOBalances = async (tokens, dao, dispatch) => {
   const usdcBalance = formatUSDC(await tokens[1].balanceOf(dao.address))
+  const availableBalance = formatUSDC(await dao.availableBalance())
   const jacdSupply = ethers.utils.formatUnits(await tokens[0].totalSupply(), 'ether')
 
   dispatch(setUSDCBalance(usdcBalance))
+  dispatch(setAvailableBalance(availableBalance))
   dispatch(setJACDSupply(jacdSupply))
-  return([usdcBalance, jacdSupply])
+  return([usdcBalance, availableBalance, jacdSupply])
 }
 
 export const loadProposals = async (dao, dispatch) => {
@@ -237,16 +272,20 @@ export const submitDonation = async (provider, dao, tokens, amount) => {
     amount = parseUSDC(amount)
 
     const signer = provider.getSigner()
+    const account = await signer.getAddress()
 
-    transaction = await tokens[1].connect(signer).approve(dao.address, amount)
-    await transaction.wait()
+    const allowance = await tokens[1].allowance(account, dao.address)
+    if (allowance.lt(amount)) {
+      transaction = await tokens[1].connect(signer).approve(dao.address, ethers.constants.MaxUint256)
+      await transaction.wait()
+    }
 
     transaction = await dao.connect(signer).receiveDeposit(amount)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -261,9 +300,9 @@ export const createProposal = async (provider, dao, recipient, amount, name, des
     transaction = await dao.connect(signer).createProposal(recipient, amount, name, description)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -276,9 +315,9 @@ export const submitHoldersVote = async (provider, dao, index, voteFor) => {
     transaction = await dao.connect(signer).holdersVote(index, voteFor)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -291,9 +330,9 @@ export const finalizeHoldersVote = async (provider, dao, index) => {
     transaction = await dao.connect(signer).finalizeHoldersVote(index)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -306,16 +345,20 @@ export const submitOpenVote = async (provider, dao, tokens, index, voteFor, jacd
     if(jacdVotes > 0) {
       jacdVotes = ethers.utils.parseUnits(jacdVotes.toString(), 'ether')
 
-      transaction = await tokens[0].connect(signer).approve(dao.address, jacdVotes)
-      await transaction.wait()
+      const account = await signer.getAddress()
+      const allowance = await tokens[0].allowance(account, dao.address)
+      if (allowance.lt(jacdVotes)) {
+        transaction = await tokens[0].connect(signer).approve(dao.address, ethers.constants.MaxUint256)
+        await transaction.wait()
+      }
     }
 
     transaction = await dao.connect(signer).openVote(index, voteFor, jacdVotes)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -328,9 +371,9 @@ export const finalizeProposal = async (provider, dao, index) => {
     transaction = await dao.connect(signer).finalizeProposal(index)
     await transaction.wait()
 
-    return true
+    return { ok: true }
   } catch (error) {
-    return false
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 
@@ -339,9 +382,9 @@ export const faucetRequest = async (provider, chainId, dao) => {
     const signer = provider.getSigner()
     const transaction = await dao.connect(signer).faucetRequest(config[chainId].manager.address)
     const receipt = await transaction.wait()
-    return receipt
+    return { ok: true, receipt }
   } catch (error) {
-    window.alert('Unable to complete faucet request')
+    return { ok: false, reason: extractRevertReason(error) }
   }
 }
 /* #endregion */

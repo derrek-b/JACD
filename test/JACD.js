@@ -116,6 +116,12 @@ describe('JACD', () => {
       expect(weights[2]).to.equal(1)
     })
 
+    it('rejects direct ETH transfers (no receive/fallback)', async () => {
+      await expect(
+        deployer.sendTransaction({ to: jacdDAO.address, value: ether(1) })
+      ).to.be.reverted
+    })
+
     it('rejects deployment when weights and collections lengths mismatch', async () => {
       const JACDDAO = await ethers.getContractFactory('JACD')
 
@@ -139,7 +145,7 @@ describe('JACD', () => {
       it('accepts token deposits', async () => {
         expect(await usdcToken.balanceOf(contributor.address)).to.equal(0)
         expect(await usdcToken.balanceOf(jacdDAO.address)).to.equal(AMOUNTINUSDC)
-        expect(await jacdDAO.usdcBalance()).to.equal(AMOUNTINUSDC)
+        expect(await jacdDAO.availableBalance()).to.equal(AMOUNTINUSDC)
       })
 
       it('distributes JACD tokens', async () => {
@@ -211,6 +217,11 @@ describe('JACD', () => {
           holder.address,
           (await ethers.provider.getBlock(await ethers.provider.getBlockNumber())).timestamp
         )
+      })
+
+      it('reserves the proposal amount against availableBalance', async () => {
+        expect(await jacdDAO.availableBalance()).to.equal(usdc(90))
+        expect(await usdcToken.balanceOf(jacdDAO.address)).to.equal(AMOUNTINUSDC)
       })
     })
 
@@ -488,6 +499,23 @@ describe('JACD', () => {
           let proposal = await jacdDAO.proposals(1)
           expect(proposal.stage).to.equal(3)
         })
+
+        it('releases reservation when proposal fails to advance', async () => {
+          transaction = await jacdDAO.connect(deployer).createProposal(rando.address, usdc(.1), 'Prop 1', 'Description of Prop 1')
+          await transaction.wait()
+
+          expect(await jacdDAO.availableBalance()).to.equal(AMOUNTINUSDC - usdc(.1))
+
+          transaction = await jacdDAO.connect(holder).holdersVote(1, false)
+          await transaction.wait()
+
+          time.increase(604801)
+
+          transaction = await jacdDAO.connect(holder).finalizeHoldersVote(1)
+          await transaction.wait()
+
+          expect(await jacdDAO.availableBalance()).to.equal(AMOUNTINUSDC)
+        })
       })
     })
 
@@ -747,8 +775,8 @@ describe('JACD', () => {
           expect(await usdcToken.balanceOf(jacdDAO.address)).to.equal(usdc(91))
         })
 
-        it('updates usdc balance', async () => {
-          expect(await jacdDAO.usdcBalance()).to.equal(usdc(91))
+        it('leaves availableBalance unchanged at finalize-pass', async () => {
+          expect(await jacdDAO.availableBalance()).to.equal(usdc(91))
         })
 
         it('updates proposal stage', async () => {
@@ -803,6 +831,25 @@ describe('JACD', () => {
 
           expect(await proposal.stage).to.equal(3)
         })
+
+        it('releases reservation when proposal fails at finalize', async () => {
+          // outer beforeEach: $100 deposit + Prop1 $10 reserve + $1 deposit = $91 available
+          expect(await jacdDAO.availableBalance()).to.equal(usdc(91))
+
+          transaction = await jacdDAO.connect(holder).openVote(1, true, 0)
+          await transaction.wait()
+
+          time.increase(1209601)
+
+          transaction = await jacdDAO.connect(holder).finalizeProposal(1)
+          await transaction.wait()
+
+          let proposal = await jacdDAO.proposals(1)
+          expect(await proposal.stage).to.equal(3)
+
+          // failed finalize releases the $10 reservation → $101 available
+          expect(await jacdDAO.availableBalance()).to.equal(usdc(101))
+        })
       })
     })
 
@@ -826,38 +873,6 @@ describe('JACD', () => {
       it('rejects finalization from non-holders', async () => {
         await expect(jacdDAO.connect(rando).finalizeProposal(1))
           .to.be.revertedWith('JACD: not a holder')
-      })
-
-      it('prevents finalization for insufficient USDC balance', async () => {
-        for(i = 2; i < 12; i++) {
-          transaction = await jacdDAO.connect(deployer).createProposal(rando.address, usdc(10), 'Prop 1', 'Description of Prop 1')
-          await transaction.wait()
-
-          transaction = await jacdDAO.connect(holder).holdersVote(i, true)
-          await transaction.wait()
-
-          transaction = await jacdDAO.connect(deployer).holdersVote(i, true)
-          await transaction.wait()
-
-          transaction = await jacdDAO.connect(holder).finalizeHoldersVote(i)
-          await transaction.wait()
-
-          transaction = await jacdDAO.connect(holder).openVote(i, true, 0)
-          await transaction.wait()
-
-          transaction = await jacdDAO.connect(deployer).openVote(i, true, 0)
-          await transaction.wait()
-        }
-
-        time.increase(1209601)
-
-        for(i = 2; i < 12; i++) {
-          transaction = await jacdDAO.connect(holder).finalizeProposal(i)
-          await transaction.wait()
-        }
-
-        await expect(jacdDAO.connect(holder).finalizeProposal(1))
-          .to.be.revertedWith('JACD: insufficient USDC balance')
       })
     })
   })
@@ -1127,6 +1142,78 @@ describe('JACD', () => {
       await transaction.wait()
 
       await expect(badDAO.connect(holder).finalizeProposal(1)).to.be.reverted
+    })
+
+    it('reverts finalizeProposal when USDC balanceOf is below proposal amount', async () => {
+      const MockBadERC20 = await ethers.getContractFactory('MockBadERC20')
+      const badUsdc = await MockBadERC20.deploy()
+
+      const FreshJACDToken = await ethers.getContractFactory('JACDToken')
+      const freshJacd = await FreshJACDToken.deploy('JACD Coin', 'JACD')
+
+      const collections = [jetpacks.address, hoverboards.address, avas.address]
+      const JACDDAO = await ethers.getContractFactory('JACD')
+      const badDAO = await JACDDAO.deploy(
+        freshJacd.address, badUsdc.address, collections,
+        10, [5, 3, 1], 6, 3, tokens(12), 604800, 1209600
+      )
+
+      transaction = await freshJacd.connect(deployer).transferOwnership(badDAO.address)
+      await transaction.wait()
+
+      transaction = await badUsdc.mint(contributor.address, usdc(100))
+      await transaction.wait()
+
+      transaction = await badUsdc.connect(contributor).approve(badDAO.address, usdc(100))
+      await transaction.wait()
+
+      transaction = await badDAO.connect(contributor).receiveDeposit(usdc(100))
+      await transaction.wait()
+
+      transaction = await jetpacks.connect(deployer).addToWhitelist(holder.address)
+      await transaction.wait()
+
+      transaction = await hoverboards.connect(deployer).addToWhitelist(holder.address)
+      await transaction.wait()
+
+      transaction = await avas.connect(deployer).addToWhitelist(deployer.address)
+      await transaction.wait()
+
+      transaction = await jetpacks.connect(holder).mint(1, { value: ether(.01) })
+      await transaction.wait()
+
+      transaction = await hoverboards.connect(holder).mint(2, { value: ether(.02) })
+      await transaction.wait()
+
+      transaction = await avas.connect(deployer).mint(3, { value: ether(.03) })
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).createProposal(rando.address, usdc(10), 'Prop 1', 'Description of Prop 1')
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).holdersVote(1, true)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).holdersVote(1, true)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).finalizeHoldersVote(1)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(holder).openVote(1, true, 0)
+      await transaction.wait()
+
+      transaction = await badDAO.connect(deployer).openVote(1, true, 0)
+      await transaction.wait()
+
+      await time.increase(1209601)
+
+      // Spoof balance below proposal.amount (usdc(10)) — accounting is intact, the token is lying
+      transaction = await badUsdc.setSpoofedBalance(badDAO.address, usdc(9))
+      await transaction.wait()
+
+      await expect(badDAO.connect(holder).finalizeProposal(1))
+        .to.be.revertedWith('JACD: insufficient USDC balance')
     })
   })
 })

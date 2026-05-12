@@ -13,9 +13,11 @@ import { addToast } from '../store/reducers/toasts'
 
 import {
   createProposal,
+  loadDAOBalances,
   loadHolderProposals,
   loadHolderVoteStatus,
-  loadProposals
+  loadProposals,
+  resultToToast
 } from '../store/interactions'
 /* #endregion */
 
@@ -26,17 +28,18 @@ const Info = () => {
 
   const [isDAOMember, setIsDAOMember] = useState(false)
   const [recipient, setRecipient] = useState('')
-  const [amount, setAmount] = useState(0)
+  const [amount, setAmount] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [isWaiting, setIsWaiting] = useState(false)
 
   const provider = useSelector((state) => state.provider.connection)
   const account = useSelector((state) => state.provider.account)
+  const tokens = useSelector((state) => state.tokens.contracts)
   const symbols = useSelector((state) => state.tokens.symbols)
   const balances = useSelector((state) => state.tokens.balances)
   const dao = useSelector((state) => state.dao.contract)
-  const usdcBalance = useSelector((state) => state.dao.usdcBalance)
+  const availableBalance = useSelector((state) => state.dao.availableBalance)
   const maxPropAmtPercent = useSelector((state) => state.dao.maxProposalAmountPercent)
   const nftBalances = useSelector((state) => state.nfts.nftBalances)
   /* #endregion */
@@ -45,24 +48,34 @@ const Info = () => {
 
   const submitHandler = async (e) => {
     e.preventDefault()
+
+    const maxAmount = maxPropAmtPercent * availableBalance / 100
+    if (+amount > maxAmount) {
+      dispatch(addToast({
+        message: `Proposal amount of ${amount} ${symbols[1]} exceeds the limit of ${maxAmount} ${symbols[1]}.`,
+        variant: 'danger'
+      }))
+      return
+    }
+
     setIsWaiting(true)
 
-    const success = await createProposal(provider, dao, recipient, amount, name, description, dispatch)
+    const result = await createProposal(provider, dao, recipient, amount, name, description, dispatch)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
     await loadHolderVoteStatus(dao, holderProposals, account, dispatch)
+    await loadDAOBalances(tokens, dao, dispatch)
 
-    setRecipient('')
-    setAmount(0)
-    setName('')
-    setDescription('')
+    if (result.ok) {
+      setRecipient('')
+      setAmount('')
+      setName('')
+      setDescription('')
+    }
     setIsWaiting(false)
 
-    dispatch(addToast({
-      message: success ? 'Proposal submitted successfully.' : 'Proposal submission failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Proposal submitted successfully.', 'Proposal submission failed')))
   }
   /* #endregion */
 
@@ -96,7 +109,7 @@ const Info = () => {
                 </Form.Group>
                 <Form.Group className='mb-3'>
                   <Form.Label>Amount</Form.Label>
-                  <Form.Text> (Max amount per proposal: {maxPropAmtPercent * usdcBalance / 100} {symbols[1]})</Form.Text>
+                  <Form.Text> (Max amount per proposal: {maxPropAmtPercent * availableBalance / 100} {symbols[1]})</Form.Text>
                   <InputGroup>
                     <Form.Control
                       type='number'
@@ -105,6 +118,7 @@ const Info = () => {
                       required
                       onChange={(e) => setAmount(e.target.value)}
                       value={amount}
+                      placeholder='Enter amount'
                     />
                     <InputGroup.Text>{symbols[1]}</InputGroup.Text>
                   </InputGroup>

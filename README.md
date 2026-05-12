@@ -58,6 +58,8 @@ Re-claiming after a duplicate-roll is part of the design — it's the visitor's 
 
 Visitors deposit mUSDC to the DAO via `receiveDeposit`. The contract mints them JACD tokens at a fixed `1e12` ratio (100 mUSDC → 100 JACD), then those tokens become spendable open-stage votes. The DAO owns the JACD token contract, so only the DAO can mint.
 
+Proposal amounts are **reserved against an `availableBalance` accounting variable at create-time** and released only if the proposal fails. The UI surfaces both numbers — "Treasury Balance" (actual mUSDC held) and "Available for Proposals" (treasury minus in-flight reservations) — because in-flight proposals can make these diverge. The max amount on a new proposal is gated against `availableBalance`, not raw treasury.
+
 ## Getting Started (Local)
 
 Three terminals:
@@ -95,8 +97,8 @@ In MetaMask:
 | `npx hardhat node` | Start local Hardhat chain (chainId 31337, port 8545) |
 | `npx hardhat run --network localhost scripts/deploy.js` | Deploy contracts to local chain — auto-writes `src/config.json["31337"]` |
 | `npx hardhat run --network localhost scripts/seed.js` | Seed local state (mUSDC, NFTs, example proposals across all stages) |
-| `npx hardhat run --network sepolia scripts/deploy_testnet.js` | Deploy contracts to Sepolia — auto-writes `src/config.json["11155111"]` |
-| `npx hardhat run --network sepolia scripts/seed_testnet.js` | Seed Sepolia state |
+| `npx hardhat run --network sepolia scripts/deploy_testnet.js` | Deploy contracts to Sepolia — auto-writes `src/config.json["11155111"]` and performs one-time bootstrap (whitelist manager on each NFT contract, manager `setApprovalForAll(dao, true)`, manager `approve(dao, MaxUint256)` for mUSDC) |
+| `npx hardhat run --network sepolia scripts/daily_testnet.js` | Recurring maintenance — refills manager mUSDC + NFTs, tops up DAO treasury, recovers NFT-contract ETH back to manager, keeps the proposal pipeline alive (creates pass-locked holder proposals, finalizes over-accumulated expired proposals, pushes active open proposals to threshold based on visitor direction). Idempotent — safe to re-run; does nothing on quiet days. Intended for daily cron after the first run, which acts as the bootstrap seed |
 
 The Sepolia scripts read `ALCHEMY_API_KEY` and `PRIVATE_KEYS` (deployer + manager, comma-separated) from `.env`.
 
@@ -110,11 +112,11 @@ jacd/
 │   ├── NFT.sol                 # ERC721Enumerable used for Jetpacks/Hoverboards/AVAs
 │   ├── USDCToken.sol           # Mock USDC for the demo (real USDC on hypothetical mainnet)
 │   └── mocks/                  # Failure-path mocks for test coverage
-├── scripts/                    # Deploy + seed scripts
+├── scripts/                    # Deploy + seed + maintenance scripts
 │   ├── deploy.js               # Local Hardhat deploy (auto-writes config.json)
-│   ├── deploy_testnet.js       # Sepolia deploy (auto-writes config.json)
-│   ├── seed.js                 # Local-scale seed
-│   └── seed_testnet.js         # Sepolia-scale seed
+│   ├── deploy_testnet.js       # Sepolia deploy + one-time bootstrap (auto-writes config.json)
+│   ├── seed.js                 # Local-scale seed (state for local dev / UI testing)
+│   └── daily_testnet.js        # Sepolia recurring maintenance — refills + proposal lifecycle
 ├── src/
 │   ├── components/             # React components, one per page tab + shared
 │   ├── store/                  # Redux Toolkit slices + the interactions layer

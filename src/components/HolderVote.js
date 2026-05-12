@@ -13,6 +13,7 @@ import Spinner from 'react-bootstrap/Spinner'
 import { addToast } from '../store/reducers/toasts'
 
 import {
+  loadDAOBalances,
   loadProposals,
   loadHolderProposals,
   submitHoldersVote,
@@ -20,7 +21,8 @@ import {
   loadOpenProposals,
   loadClosedProposals,
   loadHolderVoteStatus,
-  loadHolderOpenVoteStatus
+  loadHolderOpenVoteStatus,
+  resultToToast
 } from '../store/interactions'
 /* #endregion */
 
@@ -37,6 +39,7 @@ const HolderVote = () => {
 
   const provider = useSelector((state) => state.provider.connection)
   const account = useSelector((state) => state.provider.account)
+  const tokens = useSelector((state) => state.tokens.contracts)
   const symbols = useSelector((state) => state.tokens.symbols)
   const nftBalances = useSelector((state) => state.nfts.nftBalances)
   const dao = useSelector((state) => state.dao.contract)
@@ -88,7 +91,7 @@ const HolderVote = () => {
       voteFor = false
     }
 
-    const success = await submitHoldersVote(provider, dao, selectedProposal[0], voteFor)
+    const result = await submitHoldersVote(provider, dao, selectedProposal[0], voteFor)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
@@ -97,14 +100,11 @@ const HolderVote = () => {
     dismissModal()
     setIsVoting(false)
 
-    dispatch(addToast({
-      message: success ? 'Vote submitted successfully.' : 'Vote submission failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Vote submitted successfully.', 'Vote submission failed')))
   }
 
   const finalizeHandler = async (e) => {
-    const success = await finalizeHoldersVote(provider, dao, e.target.value)
+    const result = await finalizeHoldersVote(provider, dao, e.target.value)
 
     const proposals = await loadProposals(dao, dispatch)
     const holderProposals = await loadHolderProposals(proposals, dispatch)
@@ -112,11 +112,9 @@ const HolderVote = () => {
     const openProposals = await loadOpenProposals(proposals, dispatch)
     await loadHolderOpenVoteStatus(dao, openProposals, account, dispatch)
     await loadClosedProposals(proposals, dispatch)
+    await loadDAOBalances(tokens, dao, dispatch)
 
-    dispatch(addToast({
-      message: success ? 'Holder stage finalized.' : 'Finalization failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Holder stage finalized.', 'Finalization failed')))
   }
   /* #endregion */
 

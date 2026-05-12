@@ -37,11 +37,13 @@ After any deploy you must do two things or the system is broken:
 
 **Deposits → governance tokens.** `receiveDeposit(usdcAmount)` pulls USDC (6 decimals), then `distributeTokens` mints JACD (18 decimals) at a fixed `10**12` multiplier. Anywhere you convert between the two on-chain or in the front end, that scaling factor is the contract behavior — don't "fix" it without changing both sides.
 
+**Reservation accounting.** `availableBalance` is unencumbered treasury — decremented at `createProposal`, re-incremented on either failure branch (`finalizeHoldersVote`-fail, `finalizeProposal`-fail), unchanged at `finalizeProposal`-pass (the real ERC20 transfer handles the actual outflow). It is NOT the same as `usdcToken.balanceOf(dao)`; the difference is `Σ(amounts of proposals currently in {Holder, Open})`. The contract's max-amount check uses `availableBalance`, so the front-end max-proposal label and the `daily_testnet.js` refill check should both read `availableBalance` too. `Info.js` shows both values as separate rows ("Treasury Balance" vs "Available for Proposals").
+
 **Two-stage voting (`VoteStage` enum: Holder → Open → Finalized/Failed).**
 - `holdersVote` (stage 1): only addresses holding any NFT in `collections[]` may vote. Weight = sum of NFT balances across all collections. Tracked per-address in `holderVoted[index][addr]`.
 - `finalizeHoldersVote`: moves a proposal to `Open` if total votes ≥ `minHolderVotesToPass` AND for > against; else `Failed`. Resets vote tallies and `voteEnd` to `block.timestamp + openVoteTime`.
 - `openVote` (stage 2): NFT holders **and** JACD token contributors may vote. Each NFT contributes `holdersWeight * 1e18` votes (one-time per address per proposal, gated by `holderOpenVoted`). JACD token votes are burned via `burnFrom` (so the JACD token must have allowance set, and the DAO must own the JACD token to call `burnFrom` indirectly — `burnFrom` is the standard ERC20Burnable mechanism, which does not actually require ownership; ownership is only needed for `mint`). The same address can cast additional JACD-token-only votes after spending its NFT weight.
-- `finalizeProposal`: requires `block.timestamp > voteEnd`, `votesFor > votesAgainst`, and total ≥ `minVotesToFinalize`; transfers USDC to `proposal.recipient` and decrements `usdcBalance`.
+- `finalizeProposal`: requires `block.timestamp > voteEnd`, `votesFor > votesAgainst`, and total ≥ `minVotesToFinalize`; transfers USDC to `proposal.recipient`. The reservation made at `createProposal` already covers the spend (see "Reservation accounting" below); failed finalizes release the reservation back into `availableBalance`. Solvency `require` uses `>=` and is unreachable under correct accounting — kept as defense-in-depth.
 
 **Authorization modifiers.** `onlyHolders` (any NFT in any collection), `onlyContributors` (JACD balance > 0), `holdersOrContributors` (either). All three loop over `collections[]` — gas grows with collection count.
 
@@ -54,7 +56,7 @@ After any deploy you must do two things or the system is broken:
 - `src/index.js` wraps `<App>` in a Redux `<Provider>` (store from `src/store/store.js`). The store uses four slices: `provider`, `tokens`, `dao`, `nfts`. `serializableCheck` is **disabled** in middleware because ethers `Contract`/`Provider` instances are kept in state — leave that off.
 - All chain interaction lives in `src/store/interactions.js`. Components dispatch via these helpers; they should not instantiate contracts directly.
 - `src/components/App.js` runs `loadBlockchainData()` on mount: provider → chainId → token contracts → DAO contract → balances → proposals (split into `loadHolderProposals`/`loadOpenProposals`/`loadClosedProposals` by `VoteStage`) → NFT contracts. The UI gates on `chainId === 31337 || 11155111`; other networks show the "Wrong Network" alert.
-- ABIs in `src/abis/` are committed; rerun `npx hardhat compile` and copy from `artifacts/contracts/<Name>.sol/<Name>.json` after contract changes — only the `abi` array is needed but the full artifact is what's checked in here.
+- ABIs in `src/abis/` are committed as **bare ABI arrays** (just the `.abi` field of the Hardhat artifact, not the whole `{ abi, bytecode, ... }` object — ethers v5 `new Contract(addr, abiOrFragments, provider)` calls `.map` on its second arg and breaks at runtime if given the full artifact). After contract changes, rerun `npx hardhat compile`, then extract: `node -e "require('fs').writeFileSync('src/abis/<Name>.json', JSON.stringify(require('./artifacts/contracts/<Name>.sol/<Name>.json').abi, null, 2) + '\n')"`.
 - Routes (HashRouter): `/`, `/create_proposal`, `/holder_voting`, `/open_voting`, `/history`. `Faucet` renders outside the routes.
 
 ## Decimals cheatsheet (easy to get wrong)

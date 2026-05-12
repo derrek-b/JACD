@@ -9,10 +9,13 @@ import Alert from 'react-bootstrap/Alert'
 
 import config from '../config.json'
 
+import { addToast } from '../store/reducers/toasts'
+
 import {
   loadUserBalances,
   loadNFTBalances,
-  faucetRequest
+  faucetRequest,
+  resultToToast
 } from '../store/interactions'
 /* #endregion */
 
@@ -45,12 +48,18 @@ const Faucet = () => {
     setIsClaiming(true)
     setShowAlert(false)
 
-    const receipt = await faucetRequest(provider, chainId, dao)
+    const result = await faucetRequest(provider, chainId, dao)
 
     await loadUserBalances(tokens, account, dispatch)
     await loadNFTBalances(nfts, account, dispatch)
 
-    const event = receipt?.events?.find(e => e.event === 'FaucetClaim')
+    if (!result.ok) {
+      dispatch(addToast(resultToToast(result, '', 'Faucet claim failed')))
+      setIsClaiming(false)
+      return
+    }
+
+    const event = result.receipt?.events?.find(e => e.event === 'FaucetClaim')
     if (event) {
       const idx = event.args.collectionIdx.toNumber()
       const tokenId = event.args.tokenId.toNumber()

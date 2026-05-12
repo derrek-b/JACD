@@ -15,6 +15,7 @@ import { addToast } from '../store/reducers/toasts'
 import {
   loadUserBalances,
   loadDAOBalances,
+  resultToToast,
   submitDonation
 } from '../store/interactions'
 /* #endregion */
@@ -25,7 +26,7 @@ const Info = () => {
 
   const dispatch = useDispatch()
 
-  const [amount, setAmount] = useState(0)
+  const [amount, setAmount] = useState('')
   const [isWaiting, setIsWaiting] = useState(0)
 
   const provider = useSelector((state) => state.provider.connection)
@@ -35,6 +36,7 @@ const Info = () => {
   const dao = useSelector((state) => state.dao.contract)
   const balances = useSelector((state) => state.tokens.balances)
   const usdcBalance = useSelector((state) => state.dao.usdcBalance)
+  const availableBalance = useSelector((state) => state.dao.availableBalance)
   const jacdSupply = useSelector((state) => state.dao.jacdSupply)
   const proposals = useSelector((state) => state.dao.proposals)
   const holderProposals = useSelector((state) => state.dao.holderProposals)
@@ -47,20 +49,26 @@ const Info = () => {
 
   const donateHandler = async (e) => {
     e.preventDefault()
+
+    if (+amount > +balances[1]) {
+      dispatch(addToast({
+        message: `Donation of ${amount} ${symbols[1]} exceeds your balance of ${balances[1]} ${symbols[1]}.`,
+        variant: 'danger'
+      }))
+      return
+    }
+
     setIsWaiting(true)
 
-    const success = await submitDonation(provider, dao, tokens, amount)
+    const result = await submitDonation(provider, dao, tokens, amount)
 
     await loadDAOBalances(tokens, dao, dispatch)
     await loadUserBalances(tokens, account, dispatch)
 
-    setAmount(0)
+    if (result.ok) setAmount('')
     setIsWaiting(false)
 
-    dispatch(addToast({
-      message: success ? 'Donation submitted successfully.' : 'Donation submission failed.',
-      variant: success ? 'success' : 'danger'
-    }))
+    dispatch(addToast(resultToToast(result, 'Donation submitted successfully.', 'Donation submission failed')))
   }
 /* #endregion */
 
@@ -70,7 +78,8 @@ const Info = () => {
           <Card.Header as='h3' >DAO Info</Card.Header>
           <Card.Body>
             <Card.Title as='h4'>Token Info</Card.Title>
-            <Card.Text className='ps-3'><strong>{symbols[1]} Balance: </strong>{usdcBalance}</Card.Text>
+            <Card.Text className='ps-3'><strong>{symbols[1]} Treasury Balance: </strong>{usdcBalance}</Card.Text>
+            <Card.Text className='ps-3'><strong>{symbols[1]} Available for Proposals: </strong>{availableBalance}</Card.Text>
             <Card.Text className='ps-3'><strong>Outstanding {symbols[0]} Votes: </strong>{jacdSupply}</Card.Text>
 
             <hr />
@@ -89,6 +98,7 @@ const Info = () => {
             <Form onSubmit={donateHandler}>
               <Form.Group className='my-3'>
                 <Form.Label>Amount</Form.Label>
+                <Form.Text> ({balances[1]} {symbols[1]} available in your wallet)</Form.Text>
                 <InputGroup>
                   <Form.Control
                     type='number'
@@ -97,6 +107,7 @@ const Info = () => {
                     onChange={(e) => setAmount(e.target.value)}
                     value={amount}
                     min={1}
+                    placeholder='Enter amount'
                   />
                   <InputGroup.Text>{symbols[1]}</InputGroup.Text>
                 </InputGroup>
