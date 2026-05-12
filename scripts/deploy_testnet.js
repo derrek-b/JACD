@@ -16,59 +16,40 @@ const ether = tokens
 const votes = tokens
 
 async function main() {
+  const jacdTokenArgs = ['JACD Coin', 'JACD']
   const JACDToken = await hre.ethers.getContractFactory('JACDToken')
-  const jacdToken = await JACDToken.deploy('JACD Coin', 'JACD')
+  const jacdToken = await JACDToken.deploy(...jacdTokenArgs)
 
   console.log(`JACD Coin deployed to ${jacdToken.address}`)
 
+  const usdcTokenArgs = ['Mock USD Coin', 'mUSDC', 0]
   const USDCToken = await hre.ethers.getContractFactory('USDCToken')
-  const usdcToken = await USDCToken.deploy('Mock USD Coin', 'mUSDC', 0)
+  const usdcToken = await USDCToken.deploy(...usdcTokenArgs)
 
   console.log(`USDC Coin deployed to ${usdcToken.address}`)
 
+  const jetpacksArgs = ['Jetpacks', 'JP', ether(.0001), 10000, Date.now().toString().slice(0, 10), 'x', 10000]
   const Jetpacks = await ethers.getContractFactory('NFT')
-  const jetpacks = await Jetpacks.deploy(
-    'Jetpacks',
-    'JP',
-    ether(.0001),
-    10000,
-    Date.now().toString().slice(0, 10),
-    'x',
-    10000
-  )
+  const jetpacks = await Jetpacks.deploy(...jetpacksArgs)
 
   console.log(`Jetpacks deployed to ${jetpacks.address}`)
 
+  const hoverboardsArgs = ['Hoverboards', 'HB', ether(.0001), 10000, Date.now().toString().slice(0, 10), 'y', 10000]
   const Hoverboards = await ethers.getContractFactory('NFT')
-  const hoverboards = await Hoverboards.deploy(
-    'Hoverboards',
-    'HB',
-    ether(.0001),
-    10000,
-    Date.now().toString().slice(0, 10),
-    'y',
-    10000
-  )
+  const hoverboards = await Hoverboards.deploy(...hoverboardsArgs)
 
   console.log(`Hoverboards deployed to ${hoverboards.address}`)
 
+  const avasArgs = ['AVAs', 'AVA', ether(.0001), 10000, Date.now().toString().slice(0, 10), 'z', 10000]
   const AVAs = await ethers.getContractFactory('NFT')
-  const avas = await AVAs.deploy(
-    'AVAs',
-    'AVA',
-    ether(.0001),
-    10000,
-    Date.now().toString().slice(0, 10),
-    'z',
-    10000
-  )
+  const avas = await AVAs.deploy(...avasArgs)
 
   console.log(`AVAs deployed to ${avas.address}`)
 
   const collections = [jetpacks.address, hoverboards.address, avas.address]
-
+  const jacdArgs = [jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 30000, 10, votes(1000), 86400, 86400]
   const JACD = await hre.ethers.getContractFactory('JACD')
-  const jacd = await JACD.deploy(jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 30000, 10, votes(1000), 86400, 86400)
+  const jacd = await JACD.deploy(...jacdArgs)
 
   console.log(`JACD deployed to ${jacd.address}`)
 
@@ -112,6 +93,36 @@ async function main() {
 
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n')
   console.log(`config.json updated for chainId ${chainId}`)
+
+  // Etherscan verification — Sepolia only, and only if ETHERSCAN_API_KEY is set.
+  // Runs after config.json write so addresses are saved even if verify fails.
+  if (chainId === 11155111 && process.env.ETHERSCAN_API_KEY) {
+    console.log('\nWaiting 30s for Etherscan indexer to catch up before verifying...')
+    await new Promise((r) => setTimeout(r, 30000))
+
+    const toVerify = [
+      { name: 'JACDToken',   address: jacdToken.address,   constructorArguments: jacdTokenArgs },
+      { name: 'USDCToken',   address: usdcToken.address,   constructorArguments: usdcTokenArgs },
+      { name: 'Jetpacks',    address: jetpacks.address,    constructorArguments: jetpacksArgs },
+      { name: 'Hoverboards', address: hoverboards.address, constructorArguments: hoverboardsArgs },
+      { name: 'AVAs',        address: avas.address,        constructorArguments: avasArgs },
+      { name: 'JACD',        address: jacd.address,        constructorArguments: jacdArgs },
+    ]
+
+    for (const { name, address, constructorArguments } of toVerify) {
+      try {
+        await hre.run('verify:verify', { address, constructorArguments })
+        console.log(`  ${name} verified`)
+      } catch (e) {
+        // "Already Verified" is the common case on re-runs; surface message and continue.
+        console.log(`  ${name} verify skipped: ${e.message.split('\n')[0]}`)
+      }
+    }
+  } else if (chainId === 11155111) {
+    console.log('\nETHERSCAN_API_KEY not set — skipping verification. Set it in .env to auto-verify.')
+  }
+
+  console.log('\nNext step: run scripts/daily_testnet.js to seed manager mUSDC, NFTs, and DAO treasury.')
 }
 
 // We recommend this pattern to be able to use async/await everywhere
