@@ -68,17 +68,33 @@ async function main() {
   const collections = [jetpacks.address, hoverboards.address, avas.address]
 
   const JACD = await hre.ethers.getContractFactory('JACD')
-  const jacd = await JACD.deploy(jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 30000, 100, votes(1000), 604800, 604800)
+  const jacd = await JACD.deploy(jacdToken.address, usdcToken.address, collections, 10, [5, 3, 1], 30000, 10, votes(1000), 86400, 86400)
 
   console.log(`JACD deployed to ${jacd.address}`)
 
   const accounts = await hre.ethers.getSigners()
   const signer = accounts[0]
+  const manager = accounts[1]
 
   let transaction = await jacdToken.connect(signer).transferOwnership(jacd.address)
   await transaction.wait()
 
   console.log(`JACDToken ownership transferred to ${await jacdToken.owner()}`)
+
+  console.log('Bootstrapping faucet permissions...')
+
+  for (const nft of [jetpacks, hoverboards, avas]) {
+    transaction = await nft.connect(signer).addToWhitelist(manager.address)
+    await transaction.wait()
+
+    transaction = await nft.connect(manager).setApprovalForAll(jacd.address, true)
+    await transaction.wait()
+  }
+
+  transaction = await usdcToken.connect(manager).approve(jacd.address, hre.ethers.constants.MaxUint256)
+  await transaction.wait()
+
+  console.log('Manager whitelisted on all NFT contracts, setApprovalForAll granted, mUSDC max-approved to DAO')
 
   const { chainId } = await hre.ethers.provider.getNetwork()
   const configPath = path.join(__dirname, '..', 'src', 'config.json')
