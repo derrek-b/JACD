@@ -71,8 +71,8 @@ const HolderVote = () => {
 
   const showVoteModal = (e) => {
     setShowModal(true)
-    const proposal = e.target.value.split(',')
-    setSelectedProposal(proposal)
+    const found = holderProposals.find(p => p.index.toString() === e.target.value)
+    setSelectedProposal(found)
   }
 
   const dismissModal = () => {
@@ -171,7 +171,7 @@ const HolderVote = () => {
                                   <p>You have voted</p>
                                 ) : (
                                   <>
-                                    <Button value={proposal} onClick={showVoteModal}>View/Vote</Button>
+                                    <Button value={proposal.index.toString()} onClick={showVoteModal}>View/Vote</Button>
                                   </>
                                   )
                                 }

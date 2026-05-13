@@ -78,9 +78,9 @@ const OpenVote = () => {
 
   const showVoteModal = (e) => {
     setShowModal(true)
-    const proposal = e.target.value.split(',')
-    setVoteStatusIndex(proposal[9])
-    setSelectedProposal(proposal)
+    const idx = openProposals.findIndex(p => p.index.toString() === e.target.value)
+    setVoteStatusIndex(idx)
+    setSelectedProposal(openProposals[idx])
   }
 
   const dismissModal = () => {
@@ -213,7 +213,7 @@ const OpenVote = () => {
                               <p>No votes remaining</p>
                             ) : (
                               <div>
-                                <Button value={[proposal, index]} onClick={showVoteModal}>View/Vote</Button>
+                                <Button value={proposal.index.toString()} onClick={showVoteModal}>View/Vote</Button>
                                 {holderOpenVoteStatus[index] ? <span className='mx-2'>(holder votes submitted)</span> : ''}
                               </div>
                         )))}
