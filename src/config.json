@@ -27,22 +27,22 @@
   },
   "11155111": {
     "jacdToken": {
-      "address": "0xa787F9Ef5e6E80b93F92E68c3007Fa8b6cE1Aa22"
+      "address": "0xcCE25a8098ECc8e27c9112E549C5824805a83b7C"
     },
     "jacdDAO": {
-      "address": "0x0F538bF2C11908AA68b3c07b8DdF54cc7e2202fd"
+      "address": "0x85f9b8897c0BB1fc6bb9B1D5E225E64926075fB8"
     },
     "usdcToken": {
-      "address": "0xA0B5DACf8a20F7Fd8B561b585148123c8705b4f1"
+      "address": "0x86c6C96833b1E095A1F83F253B006E297a3C8D9c"
     },
     "jetpacks": {
-      "address": "0xC4A361085BF7e6461b9eb532401BC650339e7966"
+      "address": "0xd746529Bef88C32cEb0812df1452C2014f8e933E"
     },
     "hoverboards": {
-      "address": "0xB7724B9575d9174e646fE55EF3689b845cA460BC"
+      "address": "0x1960e6A53b108354818339147b9d55c2BCc29B3D"
     },
     "avas": {
-      "address": "0xA1E5350b6d894e49726B856C0F342dfa18215125"
+      "address": "0xfcbbC464025d896DF8f490e03b5F4C8F63a7E7D2"
     },
     "deployer": {
       "address": "0x505f182A86EA667860B82A61Fa67c1927A2Ff92f"
